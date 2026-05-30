@@ -10,6 +10,9 @@ import random
 pygame.init()
 pygame.mixer.init()
 
+
+
+
 # -----------------------------
 # SCREEN
 # -----------------------------
@@ -267,6 +270,18 @@ partner_bullet_speed = 10
 # CIVIC POSITION
 civic_x = partner_x + 60
 civic_y = partner_y + 55
+
+# -----------------------------
+# PRINT FORMATTER
+# -----------------------------
+def draw_text(surface, text, color, dest, font_name=None, font_size=35):
+    if font_name:
+        font = pygame.font.Font("fonts/" + font_name + ".ttf", font_size)
+    else:
+        font = pygame.font.SysFont(None, font_size)
+    surface.blit(font.render(text, True, color), dest)
+
+
 # =========================================================
 # PARTNER ANIMATION FUNCTION
 # =========================================================
@@ -1111,86 +1126,18 @@ while running:
     # -----------------------------
     # UI
     # -----------------------------
-    font = pygame.font.SysFont(None, 35)
-    screen.blit(
-        font.render(
-            f"Shots: {shots}/{max_shots}",
-            True,
-            (255, 255, 255)
-        ),
-        (20, 20)
-    )
-    screen.blit(
-        font.render(
-            f"Action: {current_action}",
-            True,
-            (255, 255, 0)
-        ),
-        (20, 60)
-    )
-    screen.blit(
-        font.render(
-            f"Enemy: {enemy_action}",
-            True,
-            (255, 100, 100)
-        ),
-        (20, 100)
-    )
-    screen.blit(
-        font.render(
-            f"Player HP: {int(player_hp)}",
-            True,
-            (100, 255, 100)
-        ),
-        (20, 140)
-    )
-    screen.blit(
-        font.render(
-            f"Enemy HP: {enemy_hp:.1f}",
-            True,
-            (255, 100, 100)
-        ),
-        (20, 180)
-    )
+    draw_text(screen, f"Shots: {shots}/{max_shots}", (255, 255, 255), (20, 20), "vcrosdmono", 35)
+    draw_text(screen, f"Action: {current_action}", (255, 255, 0), (20, 60), "vcrosdmono", 35)
+    draw_text(screen, f"Enemy: {enemy_action}", (255, 100, 100), (20, 100), "vcrosdmono", 35)
+    draw_text(screen, f"Player HP: {int(player_hp)}", (100, 255, 100), (20, 140), "vcrosdmono", 35)
+    draw_text(screen, f"Enemy HP: {enemy_hp:.1f}", (255, 100, 100), (20, 180), "vcrosdmono", 35)
     if now - rage_start_time >= ending_time:
-        screen.blit(
-            font.render(
-                f"Can Kill: {bool(can_kill)}",
-                True,
-                (255, 100, 100)
-            ),
-            (20, 240)
-        )
-    screen.blit(
-        font.render(
-            f"Time: {int(now)}",
-            True,
-            (255, 100, 100)
-        ),
-        (20, 280)
-    )
+        draw_text(screen, f"Can Kill: {bool(can_kill)}", (255, 100, 100), (20, 240), "vcrosdmono", 35)
+    draw_text(screen, f"Time: {int(now)}", (255, 100, 100), (20, 280), "vcrosdmono", 35)
     if rage_mode:
-        screen.blit(
-            font.render(
-                "RAGE MODE",
-                True,
-                (255, 40, 40)
-            ),
-            (20, 220)
-        )
-    # -----------------------------
-    # GAME END TEXT
-    # -----------------------------
+        draw_text(screen, "RAGE MODE", (255, 40, 40), (20, 220), "vcrosdmono", 35)
     if game_end:
-        end_font = pygame.font.SysFont(None, 80)
-        end_text = end_font.render(game_result, True, (255, 50, 50))
-        screen.blit(
-            end_text,
-            (
-                WIDTH // 2 - end_text.get_width() // 2,
-                HEIGHT // 2
-            )
-        )
+        draw_text(screen, game_result, (255, 50, 50), (WIDTH // 2, HEIGHT // 2), "vcrosdmono", 35)
     pygame.display.flip()
 pygame.quit()
 sys.exit()
