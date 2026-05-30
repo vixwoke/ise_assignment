@@ -10,7 +10,18 @@ import random
 pygame.init()
 pygame.mixer.init()
 
+# -----------------------------
+# LOAD SOUND EFFECTS
+# -----------------------------
+snd_gun = pygame.mixer.Sound("audio/gun.wav")
+snd_shotgun = pygame.mixer.Sound("audio/shotgun.wav")
+snd_reload = pygame.mixer.Sound("audio/reload.wav")
+snd_howl = pygame.mixer.Sound("audio/howl.wav")
+snd_melee = pygame.mixer.Sound("audio/melee_hit.wav")
 
+# Optional: lower the volume of the gunshots so they don't blow out your speakers
+snd_gun.set_volume(0.4)
+snd_howl.set_volume(0.8)
 
 
 # -----------------------------
@@ -325,6 +336,7 @@ def activate_rage_mode():
     global shot_frames
     global player_regen_amount
     global scale_multiplier
+    snd_howl.play()
     rage_mode = True
     idle_frames = rage_idle_frames
     walk_frames = rage_walk_frames
@@ -513,10 +525,12 @@ while running:
                     if can_shoot() and not moving:
                         if shots <= 0 :
                             recharging = True
+                            snd_reload.play()
                             recharge_start = pygame.time.get_ticks()
                             change_animation("recharge", recharge_frames)
                         else:
                             shots -= 1
+                            snd_gun.play()
                             change_animation("shoot", shot_frames)
                             bullet_x = x + FRAME_W // 2
                             bullet_y = y + 90
@@ -655,6 +669,7 @@ while running:
         # pygame.draw.rect(screen, (255, 0, 0), attack_rect, 2)
         if attack_rect.colliderect(enemy_rect) and not attack_has_hit:
             attack_has_hit = True
+            snd_melee.play()
             if not enemy_dead and enemy_action != "hurt":
                 # =====================================
                 # ENDING EXECUTION SYSTEM
@@ -840,6 +855,7 @@ while running:
             if attack_rect.colliderect(player_rect):
                 if now - last_player_hit >= player_hit_cooldown:
                     last_player_hit = now
+                    snd_melee.play()
                     player_hp -= enemy_attack_damage
                     if player_hp <= 0:
                         player_hp = 0
@@ -971,8 +987,9 @@ while running:
             and now - partner_last_shot >= partner_shot_interval
     ):
         partner_last_shot = now
+        snd_shotgun.play()
         change_partner_animation("shoot", partner_shot_frames)
-        # SHOOT 3 BULLETS
+        # SHOOT 3 BULLETSu
         # SHOTGUN SPREAD
         spread_angles = [-15, 0, 15]
         for angle in spread_angles:
