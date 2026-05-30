@@ -36,6 +36,9 @@ class TimelineManager:
         def trigger_rage_mode(game):
             if not game.player.rage_mode:
                 game.player.activate_rage()
+                game.enemy.hp = game.enemy.max_hp
+                game.enemy.make_normal()
+                game.player.hp = game.player.max_hp
 
         # Event 3: Ending Sequence Triggered
         def trigger_ending(game):
