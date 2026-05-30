@@ -1,3 +1,4 @@
+from timeline import TimelineManager
 import pygame
 import sys
 from config import (
@@ -61,6 +62,7 @@ class Game:
         self.enemy = Enemy(enemy_normal, enemy_wounded)
         self.partner = Partner(partner_anims)
         self.bullets = BulletManager()
+        self.timeline = TimelineManager(self)
 
         # Civic
         self.civic_x = self.partner.x + 60
@@ -105,29 +107,9 @@ class Game:
             return True
         return False
 
-    # Ending / execution system
+    # Ending / execution system (Now delegated to self.timeline)
     def update_endings(self, now):
-        if now >= ENDGAME_TIME:
-            return False
-
-        if not self.ending_triggered and now - self.start_time >= ENDING_TIME:
-            self.ending_triggered = True
-            self.enemy.locked = False
-
-        if (self.ending_triggered and not self.enemy.dead
-                and now - self.start_time >= ESCAPE_TIME):
-            self.enemy.escape = True
-            self.enemy.locked = False
-            self.enemy.set_animation("run", self.enemy.anims["run"])
-            self.enemy.facing_right = False
-
-        if not self.enemy.march and now - self.enemy_start_time >= ENEMY_TARGET_TIME:
-            self.enemy.march = True
-
-        if not self.player.rage_mode and now - self.start_time >= RAGE_TRIGGER_TIME:
-            self.player.activate_rage()
-
-        return True
+        return self.timeline.update(now)
 
     def check_execution(self):
         p = self.player
