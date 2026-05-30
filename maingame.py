@@ -7,11 +7,16 @@ import wave
 from pyscreenrecorder import ScreenRecorder
 import math
 import random
+
 pygame.init()
 pygame.mixer.init()
 
+DEBUG = True
 
-
+DEFAULTBLUE = (0,0,255)
+DEFAULTGREEN = (0,255,0)
+DEFAULTRED = (255,0,0)
+DEFAULTWHITE = (255,255,255)
 
 # -----------------------------
 # SCREEN
@@ -19,16 +24,18 @@ pygame.mixer.init()
 WIDTH = 1200
 HEIGHT = 700
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Top Down Character")
+pygame.display.set_caption("maingame.py")
 pygame.mixer.music.load("waking demon.mp3")
-pygame.mixer.music.set_volume(0.5)
+pygame.mixer.music.set_volume(0.0)
 pygame.mixer.music.play(-1)
 clock = pygame.time.Clock()
 
 # -----------------------------
 # LOAD BACKGROUND
 # -----------------------------
-bgGrassGround = pygame.image.load("background/grass-ground-1.png")
+bgFightFull = pygame.image.load("background/night-grass-full.png")
+bgFightGround = pygame.image.load("background/night-grass-ground.png").convert_alpha()
+bgFightSky = pygame.image.load("background/night-grass-sky.png").convert_alpha()
 
 # -----------------------------
 # LOAD SPRITESHEET
@@ -38,9 +45,9 @@ def load_sheet(path, frame_width, frame_height):
     sheet = pygame.image.load(path).convert_alpha()
     frames = []
     sheet_width = sheet.get_width()
-    for x in range(0, sheet_width, frame_width):
+    for player_x in range(0, sheet_width, frame_width):
         frame = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
-        frame.blit(sheet, (0, 0), (x, 0, frame_width, frame_height))
+        frame.blit(sheet, (0, 0), (player_x, 0, frame_width, frame_height))
         frames.append(frame)
     return frames
 
@@ -54,6 +61,18 @@ FRAME_H = 128
 # SCALE
 # -----------------------------
 scale_multiplier = 1.0
+
+# Player character offset within frame (whitespace padding)
+PLAYER_CHAR_OFFSET_X = 40
+PLAYER_CHAR_OFFSET_Y = 60
+PLAYER_CHAR_HITBOX_W = FRAME_W - 80   # 48
+PLAYER_CHAR_HITBOX_H = FRAME_H - 60   # 68
+
+# Enemy character offset within frame (whitespace padding)
+ENEMY_CHAR_OFFSET_X = 40
+ENEMY_CHAR_OFFSET_Y = 65
+ENEMY_CHAR_HITBOX_W = 70
+ENEMY_CHAR_HITBOX_H = 60
 
 # -----------------------------
 # LOAD PLAYER ANIMATIONS
@@ -117,8 +136,8 @@ woundedRun_frames = load_sheet(woundedEnemyPath + "Run.png", FRAME_W, FRAME_H)
 # -----------------------------
 # PLAYER
 # -----------------------------
-x = WIDTH // 4
-y = HEIGHT // 2
+player_x = WIDTH // 4 + PLAYER_CHAR_OFFSET_X
+player_y = HEIGHT // 2 + PLAYER_CHAR_OFFSET_Y
 speed = 5
 facing_right = True
 
@@ -200,8 +219,8 @@ jump_animation_speed = 0.25
 # -----------------------------
 # ENEMY
 # -----------------------------
-enemy_x = WIDTH // 2
-enemy_y = HEIGHT // 2
+enemy_x = WIDTH // 2 + ENEMY_CHAR_OFFSET_X
+enemy_y = HEIGHT // 2 + ENEMY_CHAR_OFFSET_Y
 enemy_animation = enemyIdle_frames
 enemy_action = "idle"
 enemy_frame_index = 0.0
@@ -209,6 +228,8 @@ enemy_attack_timer = pygame.time.get_ticks()
 enemy_attack_interval = 3000
 enemy_animation_speed = 0.15
 enemy_partner_damage = 1
+enemy_fall_speed = 0
+enemy_on_ground = False
 
 # -----------------------------
 # ENEMY MARCH SYSTEM
@@ -309,6 +330,15 @@ def change_animation(new_action, new_frames):
         frame_index = 0.0
 civic_img = pygame.image.load("partner/civic.png").convert_alpha()
 civic_img = pygame.transform.scale(civic_img, (90, 90))
+
+# -----------------------------
+# GROUND DETECTION
+# -----------------------------
+def is_on_ground(px, py):
+    if 0 <= px < WIDTH and 0<= py < HEIGHT:
+        return bgFightGround.get_at((int(px), int(py))).a > 0
+    else:
+        return False
 
 # -----------------------------
 # ACTIVATE RAGE MODE
@@ -415,7 +445,6 @@ def can_walk():
         "shoot",
         "attack",
         "recharge",
-        "jump",
         "hurt",
         "dead"
     ]
@@ -451,6 +480,9 @@ def can_evade():
 # -----------------------------
 # GAME LOOP
 # -----------------------------
+GRAVITY = 2
+fall_speed = 0
+on_ground = True
 running = True
 while running:
     clock.tick(60)
@@ -518,8 +550,8 @@ while running:
                         else:
                             shots -= 1
                             change_animation("shoot", shot_frames)
-                            bullet_x = x + FRAME_W // 2
-                            bullet_y = y + 90
+                            bullet_x = player_x + 40
+                            bullet_y = player_y + 35
                             direction = 1 if facing_right else -1
                             bullets.append([
                                 bullet_x,
@@ -552,17 +584,17 @@ while running:
         # -----------------------------
         # EVADE
         # -----------------------------
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE:
-                if can_evade():
-                    recharging = False
-                    evading = True
-                    if facing_right:
-                        evade_dx = -6
-                    else:
-                        evade_dx = 6
-                    evade_dy = 0
-                    change_animation("jump", jump_frames)
+        # if event.type == pygame.KEYDOWN:
+        #     if event.key == pygame.K_SPACE:
+        #         if can_evade():
+        #             recharging = False
+        #             evading = True
+        #             if facing_right:
+        #                 evade_dx = -6
+        #             else:
+        #                 evade_dx = 6
+        #             evade_dy = 0
+        #             change_animation("jump", jump_frames)
     # -----------------------------
     # PLAYER MOVEMENT
     # -----------------------------
@@ -575,50 +607,98 @@ while running:
             dx = speed
             moving = True
             facing_right = True
-        if keys[pygame.K_w]:
-            dy = -speed
-            moving = True
-        if keys[pygame.K_s]:
-            dy = speed
-            moving = True
-        x += dx
-        y += dy
+        # if keys[pygame.K_w]:
+        #     dy = -speed
+        #     moving = True
+        # if keys[pygame.K_s]:
+        #     dy = speed
+        #     moving = True
+        player_x += dx
+        player_y += dy
     # -----------------------------
     # EVADE MOVEMENT
     # -----------------------------
     if evading:
-        x += evade_dx
-        y += evade_dy
+        player_x += evade_dx
+        player_y += evade_dy
     # -----------------------------
     # LEAP MOVEMENT
     # -----------------------------
     if leaping:
         # CHECK NEXT POSITION
-        future_rect = pygame.Rect(x + leap_dx, y + 30 + leap_dy, 50, 70)
+        future_rect = pygame.Rect(player_x + leap_dx, player_y - 30 + leap_dy, 50, 70)
         # STOP MOVEMENT IF HITTING ENEMY
-        if future_rect.colliderect(enemy_rect):
+        if future_rect.colliderect(enemy_hitbox):
             leap_dx = 0
             leap_dy = 0
-        x += leap_dx
-        y += leap_dy
+        player_x += leap_dx
+        player_y += leap_dy
+
+    # -----------------------------
+    # GRAVITY
+    # -----------------------------
+    fall_speed += GRAVITY
+    player_y += fall_speed
+
+    feet_x = int(player_x + (FRAME_W / 2 - PLAYER_CHAR_OFFSET_X) * scale_multiplier)
+    feet_y = int(player_y + (FRAME_H - PLAYER_CHAR_OFFSET_Y) * scale_multiplier)
+
+    if is_on_ground(feet_x, feet_y):
+        while is_on_ground(int(feet_x), int(feet_y)):
+            feet_y -= 1
+        player_y = feet_y - (FRAME_H - PLAYER_CHAR_OFFSET_Y) * scale_multiplier
+        fall_speed = 0
+        on_ground = True
+    else:
+        on_ground = False
+
+    # -----------------------------
+    # JUMP
+    # -----------------------------
+    if can_walk() and keys[pygame.K_SPACE] and on_ground:
+        fall_speed = -20
+        change_animation("jump", jump_frames)
+        on_ground = False
+
+    # -----------------------------
+    # ENEMY GRAVITY
+    # -----------------------------
+    enemy_fall_speed += GRAVITY
+    enemy_y += enemy_fall_speed
+
+    enemy_feet_x = int(enemy_x + (FRAME_W / 2 - ENEMY_CHAR_OFFSET_X) * scale_multiplier)
+    enemy_feet_y = int(enemy_y + (FRAME_H - ENEMY_CHAR_OFFSET_Y) * scale_multiplier)
+
+    if is_on_ground(enemy_feet_x, enemy_feet_y):
+        while is_on_ground(int(enemy_feet_x), int(enemy_feet_y)):
+            enemy_feet_y -= 1
+        enemy_y = enemy_feet_y - (FRAME_H - ENEMY_CHAR_OFFSET_Y) * scale_multiplier
+        enemy_fall_speed = 0
+        enemy_on_ground = True
+    else:
+        enemy_on_ground = False
+
     # -----------------------------
     # SCREEN BOUNDARY LIMITS
     # -----------------------------
-    scaled_w = FRAME_W * scale_multiplier
-    scaled_h = FRAME_H * scale_multiplier
-    if x < 0:
-        x = 0
-    if x > WIDTH - scaled_w:
-        x = WIDTH - scaled_w
-    if y < 0:
-        y = 0
-    if y > HEIGHT - scaled_h:
-        y = HEIGHT - scaled_h
+    char_scaled_w = PLAYER_CHAR_HITBOX_W * scale_multiplier
+    if player_x < 0:
+        player_x = 0
+    if player_x > WIDTH - char_scaled_w:
+        player_x = WIDTH - char_scaled_w
+    if player_y < 0:
+        player_y = 0
+    if player_y > HEIGHT:
+        dead = True
+
+    #
     # -----------------------------
     # RECTS
     # -----------------------------
-    player_rect = pygame.Rect(x, y + 30, 50, 70)
-    enemy_rect = pygame.Rect(enemy_x + 35, enemy_y + 30, 50, 70)
+    player_hitbox = pygame.Rect(player_x, player_y, int(PLAYER_CHAR_HITBOX_W * scale_multiplier), int(PLAYER_CHAR_HITBOX_H * scale_multiplier))
+    
+    enemy_hitbox = pygame.Rect(enemy_x, enemy_y, ENEMY_CHAR_HITBOX_W, ENEMY_CHAR_HITBOX_H)
+
     # -----------------------------
     # BULLETS
     # -----------------------------
@@ -626,7 +706,7 @@ while running:
     for bullet in bullets:
         bullet[0] += bullet_speed * bullet[2]
         bullet_rect = pygame.Rect(bullet[0], bullet[1], 12, 12)
-        if bullet_rect.colliderect(enemy_rect):
+        if bullet_rect.colliderect(enemy_hitbox):
             bullets_to_remove.append(bullet)
             if not enemy_dead:
                 enemy_hp -= 1
@@ -648,12 +728,12 @@ while running:
     if current_action == "attack":
         # ATTACK HITBOX IN FRONT ONLY
         if facing_right:
-            attack_rect = pygame.Rect(x + 80, y + 30, 20, 50)
+            attack_rect = pygame.Rect(player_x + 80, player_y - 30, 20, 50)
         else:
-            attack_rect = pygame.Rect(x - 10, y + 30, 20, 50)
-        # DEBUG HITBOX
-        # pygame.draw.rect(screen, (255, 0, 0), attack_rect, 2)
-        if attack_rect.colliderect(enemy_rect) and not attack_has_hit:
+            attack_rect = pygame.Rect(player_x - 10, player_y - 30, 20, 50)
+        if DEBUG:
+            pygame.draw.rect(screen, (255, 0, 0), attack_rect, 2)
+        if attack_rect.colliderect(enemy_hitbox) and not attack_has_hit:
             attack_has_hit = True
             if not enemy_dead and enemy_action != "hurt":
                 # =====================================
@@ -690,10 +770,10 @@ while running:
     # -----------------------------
     if current_action == "shoot" and rage_mode:
         if facing_right:
-            leap_rect = pygame.Rect(x + 40, y + 20, 140, 90)
+            leap_rect = pygame.Rect(player_x + 40, player_y - 40, 140, 90)
         else:
-            leap_rect = pygame.Rect(x - 90, y + 20, 140, 90)
-        if leap_rect.colliderect(enemy_rect) and not attack_has_hit:
+            leap_rect = pygame.Rect(player_x - 90, player_y - 40, 140, 90)
+        if leap_rect.colliderect(enemy_hitbox) and not attack_has_hit:
             attack_has_hit = True
             if not enemy_dead and enemy_action != "hurt":
                 if rage_mode and ending_triggered:
@@ -831,13 +911,13 @@ while running:
         if 4 <= current_enemy_frame <= 5:
             # ATTACK HITBOX
             if enemy_facing_right:
-                attack_rect = pygame.Rect(enemy_x + 60, enemy_y + 45, 20, 50)
+                attack_rect = pygame.Rect(enemy_x + 20, enemy_y - 20, 20, 50)
             else:
-                attack_rect = pygame.Rect(enemy_x - 30, enemy_y + 45, 30, 50)
-            # DEBUG
-            # pygame.draw.rect(screen, (255,0,0), attack_rect, 2)
+                attack_rect = pygame.Rect(enemy_x - 70, enemy_y - 20, 30, 50)
+            if DEBUG:
+                pygame.draw.rect(screen, (255,0,0), attack_rect, 2)
             # DAMAGE PLAYER
-            if attack_rect.colliderect(player_rect):
+            if attack_rect.colliderect(player_hitbox):
                 if now - last_player_hit >= player_hit_cooldown:
                     last_player_hit = now
                     player_hp -= enemy_attack_damage
@@ -866,7 +946,7 @@ while running:
                 and current_enemy_frame == 4
                 and not enemy_has_hit_partner
         ):
-            attack_rect = pygame.Rect(enemy_x + 60, enemy_y + 45, 20, 40)
+            attack_rect = pygame.Rect(enemy_x + 20, enemy_y - 20, 20, 40)
             if attack_rect.colliderect(partner_rect):
                 partner_hp -= enemy_partner_damage
                 enemy_has_hit_partner = True
@@ -979,8 +1059,8 @@ while running:
             bullet_x = partner_x + 90
             bullet_y = partner_y + 70
             # AIM AT ENEMY
-            target_x = enemy_x + 60
-            target_y = enemy_y + 60
+            target_x = enemy_x + 20
+            target_y = enemy_y - 5
             dx = target_x - bullet_x
             dy = target_y - bullet_y
             distance = math.sqrt(dx * dx + dy * dy)
@@ -1015,7 +1095,7 @@ while running:
         bullet[1] += bullet[3] * partner_bullet_speed
         bullet_rect = pygame.Rect(bullet[0], bullet[1], 10, 10)
         # HIT ENEMY
-        if bullet_rect.colliderect(enemy_rect):
+        if bullet_rect.colliderect(enemy_hitbox):
             partner_remove.append(bullet)
             if not enemy_dead:
                 enemy_hp -= 1
@@ -1054,7 +1134,8 @@ while running:
     # -----------------------------
     # DRAW
     # -----------------------------
-    screen.blit(bgGrassGround, (0, 0))
+    screen.blit(bgFightFull, (0, 0))
+    screen.blit(bgFightGround, (0, 0))
     # DRAW ENEMY
     enemy_frame = enemy_animation[
         int(enemy_frame_index)
@@ -1069,7 +1150,9 @@ while running:
             int(FRAME_H * scale_multiplier)
         )
     )
-    screen.blit(enemy_frame, (enemy_x, enemy_y))
+    enemy_frame_x = enemy_x - ENEMY_CHAR_OFFSET_X * scale_multiplier
+    enemy_frame_y = enemy_y - ENEMY_CHAR_OFFSET_Y * scale_multiplier
+    screen.blit(enemy_frame, (enemy_frame_x, enemy_frame_y))
     # DRAW PLAYER
     current_frame = current_animation[
         int(frame_index)
@@ -1083,7 +1166,9 @@ while running:
             int(FRAME_H * scale_multiplier)
         )
     )
-    screen.blit(current_frame, (x, y))
+    frame_x = player_x - PLAYER_CHAR_OFFSET_X * scale_multiplier
+    frame_y = player_y - PLAYER_CHAR_OFFSET_Y * scale_multiplier
+    screen.blit(current_frame, (frame_x, frame_y))
     # DRAW BULLETS
     for bullet in bullets:
         pygame.draw.circle(
@@ -1093,7 +1178,7 @@ while running:
                 int(bullet[0]),
                 int(bullet[1])
             ),
-            6
+            4
         )
     screen.blit(civic_img, (civic_x, civic_y))
     # =========================================================
@@ -1126,18 +1211,66 @@ while running:
     # -----------------------------
     # UI
     # -----------------------------
-    draw_text(screen, f"Shots: {shots}/{fullMag}", (255, 255, 255), (20, 20), "vcrosdmono", 35)
-    draw_text(screen, f"Action: {current_action}", (255, 255, 0), (20, 60), "vcrosdmono", 35)
-    draw_text(screen, f"Enemy: {enemy_action}", (255, 100, 100), (20, 100), "vcrosdmono", 35)
-    draw_text(screen, f"Player HP: {int(player_hp)}", (100, 255, 100), (20, 140), "vcrosdmono", 35)
-    draw_text(screen, f"Enemy HP: {enemy_hp:.1f}", (255, 100, 100), (20, 180), "vcrosdmono", 35)
-    if now - rage_start_time >= ending_time:
-        draw_text(screen, f"Can Kill: {bool(can_kill)}", (255, 100, 100), (20, 240), "vcrosdmono", 35)
-    draw_text(screen, f"Time: {int(now)}", (255, 100, 100), (20, 280), "vcrosdmono", 35)
-    if rage_mode:
-        draw_text(screen, "RAGE MODE", (255, 40, 40), (20, 220), "vcrosdmono", 35)
-    if game_end:
-        draw_text(screen, game_result, (255, 50, 50), (WIDTH // 2, HEIGHT // 2), "vcrosdmono", 35)
+    if DEBUG:
+        draw_text(screen, f"Shots: {shots}/{fullMag}", (255, 255, 255), (20, 20), "vcrosdmono", 35)
+        draw_text(screen, f"Action: {current_action}", (255, 255, 0), (20, 60), "vcrosdmono", 35)
+        draw_text(screen, f"Enemy: {enemy_action}", (255, 100, 100), (20, 100), "vcrosdmono", 35)
+        draw_text(screen, f"Player HP: {int(player_hp)}", (100, 255, 100), (20, 140), "vcrosdmono", 35)
+        draw_text(screen, f"Enemy HP: {enemy_hp:.1f}", (255, 100, 100), (20, 180), "vcrosdmono", 35)
+        if now - rage_start_time >= ending_time:
+            draw_text(screen, f"Can Kill: {bool(can_kill)}", (255, 100, 100), (20, 240), "vcrosdmono", 35)
+        draw_text(screen, f"Time: {int(now)}", (255, 100, 100), (20, 280), "vcrosdmono", 35)
+        if rage_mode:
+            draw_text(screen, "RAGE MODE", (255, 40, 40), (20, 220), "vcrosdmono", 35)
+        if game_end:
+            draw_text(screen, game_result, (255, 50, 50), (WIDTH // 2, HEIGHT // 2), "vcrosdmono", 35)
+
+    if DEBUG:
+        pf_rect = pygame.Rect(
+            int(player_x - PLAYER_CHAR_OFFSET_X * scale_multiplier),
+            int(player_y - PLAYER_CHAR_OFFSET_Y * scale_multiplier),
+            int(FRAME_W * scale_multiplier),
+            int(FRAME_H * scale_multiplier)
+        )
+        ef_rect = pygame.Rect(
+            int(enemy_x - ENEMY_CHAR_OFFSET_X * scale_multiplier),
+            int(enemy_y - ENEMY_CHAR_OFFSET_Y * scale_multiplier),
+            int(FRAME_W * scale_multiplier),
+            int(FRAME_H * scale_multiplier)
+        )
+
+        DBG_PF = (255, 255, 0)      # Player Frame: Yellow
+        DBG_PC = (0, 255, 0)        # Player Char: Green
+        DBG_EF = (255, 0, 255)      # Enemy Frame: Magenta
+        DBG_EC = (255, 0, 0)        # Enemy Char: Red
+
+        for rect, color, label in [
+            (pf_rect, DBG_PF, "Player Frame"),
+            (player_hitbox, DBG_PC, "Player Char"),
+            (ef_rect, DBG_EF, "Enemy Frame"),
+            (enemy_hitbox, DBG_EC, "Enemy Char"),
+        ]:
+            pygame.draw.rect(screen, color, rect, 2)
+            draw_text(screen, label, color, (rect.x + 2, rect.y + 2), "vcrosdmono", 14)
+            for cx, cy in [
+                (rect.x, rect.y),
+                (rect.right - 1, rect.y),
+                (rect.x, rect.bottom - 1),
+                (rect.right - 1, rect.bottom - 1),
+            ]:
+                pygame.draw.circle(screen, color, (cx, cy), 4)
+
+        # Info panel at top-right
+        info_y = 20
+        for rect, color, label in [
+            (pf_rect, DBG_PF, "Player Frame"),
+            (player_hitbox, DBG_PC, "Player Char"),
+            (ef_rect, DBG_EF, "Enemy Frame"),
+            (enemy_hitbox, DBG_EC, "Enemy Char"),
+        ]:
+            draw_text(screen, f"{label}: ({rect.x},{rect.y}) {rect.w}x{rect.h}", color, (WIDTH - 450, info_y), "vcrosdmono", 16)
+            info_y += 22
+
     pygame.display.flip()
 pygame.quit()
 sys.exit()
