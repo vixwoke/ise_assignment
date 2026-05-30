@@ -88,19 +88,19 @@ PARTNER_SPREAD_ANGLES = [-15, 0, 15]
 DEFAULT_SCALE = 1.0
 
 # Backgrounds (layered)
-BG_FULL_PATH = "background/night-grass-full.png"
-BG_GROUND_PATH = "background/night-grass-ground.png"
-BG_SKY_PATH = "background/night-grass-sky.png"
+BG_FULL_PATH = "resources/image/sprites/background/night-grass-full.png"
+BG_GROUND_PATH = "resources/image/sprites/background/night-grass-ground.png"
+BG_SKY_PATH = "resources/image/sprites/background/night-grass-sky.png"
 
 # Font
 FONT_NAME = "vcrosdmono"
 FONT_SIZE = 35
 
 # Asset paths
-PLAYER_PATH = "maincharacter/"
-RAGE_PATH = "rageCharacter/"
-ENEMY_PATH = "enemy/"
-WOUNDED_ENEMY_PATH = "woundedEnemy/"
-PARTNER_PATH = "partner/"
-MUSIC_PATH = "waking demon.mp3"
+PLAYER_PATH = "resources/image/sprites/maincharacter/"
+RAGE_PATH = "resources/image/sprites/rageCharacter/"
+ENEMY_PATH = "resources/image/sprites/enemy/"
+WOUNDED_ENEMY_PATH = "resources/image/sprites/woundedEnemy/"
+PARTNER_PATH = "resources/image/sprites/partner/"
+MUSIC_PATH = "resources/audio/musics/waking demon.mp3"
 MUSIC_VOLUME = 0.0

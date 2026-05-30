@@ -25,7 +25,7 @@ WIDTH = 1200
 HEIGHT = 700
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("maingame.py")
-pygame.mixer.music.load("waking demon.mp3")
+pygame.mixer.music.load("resources/audio/musics/waking demon.mp3")
 pygame.mixer.music.set_volume(0.0)
 pygame.mixer.music.play(-1)
 clock = pygame.time.Clock()
@@ -33,9 +33,9 @@ clock = pygame.time.Clock()
 # -----------------------------
 # LOAD BACKGROUND
 # -----------------------------
-bgFightFull = pygame.image.load("background/night-grass-full.png")
-bgFightGround = pygame.image.load("background/night-grass-ground.png").convert_alpha()
-bgFightSky = pygame.image.load("background/night-grass-sky.png").convert_alpha()
+bgFightFull = pygame.image.load("resources/image/sprites/background/night-grass-full.png")
+bgFightGround = pygame.image.load("resources/image/sprites/background/night-grass-ground.png").convert_alpha()
+bgFightSky = pygame.image.load("resources/image/sprites/background/night-grass-sky.png").convert_alpha()
 
 # -----------------------------
 # LOAD SPRITESHEET
@@ -77,7 +77,7 @@ ENEMY_CHAR_HITBOX_H = 60
 # -----------------------------
 # LOAD PLAYER ANIMATIONS
 # -----------------------------
-path = "maincharacter/"
+path = "resources/image/sprites/maincharacter/"
 idle_frames = load_sheet(path + "Idle.png", FRAME_W, FRAME_H)
 walk_frames = load_sheet(path + "Walk.png", FRAME_W, FRAME_H)
 jump_frames = load_sheet(path + "Jump.png", FRAME_W, FRAME_H)
@@ -90,7 +90,7 @@ shot_frames = load_sheet(path + "Shot_1.png", FRAME_W, FRAME_H)
 # -----------------------------
 # LOAD RAGE PLAYER ANIMATIONS
 # -----------------------------
-rageMainCharacterPath = "rageCharacter/"
+rageMainCharacterPath = "resources/image/sprites/rageCharacter/"
 rage_idle_frames = load_sheet(rageMainCharacterPath + "Idle.png", FRAME_W, FRAME_H)
 rage_walk_frames = load_sheet(rageMainCharacterPath + "Walk.png", FRAME_W, FRAME_H)
 rage_jump_frames = load_sheet(rageMainCharacterPath + "Jump.png", FRAME_W, FRAME_H)
@@ -109,8 +109,8 @@ rage_attack_list = [
 # -----------------------------
 # LOAD NORMAL ENEMY ANIMATIONS
 # -----------------------------
-enemyPath = "enemy/"
-woundedEnemyPath = "woundedEnemy/"
+enemyPath = "resources/image/sprites/enemy/"
+woundedEnemyPath = "resources/image/sprites/woundedEnemy/"
 enemyAttack_frames = load_sheet(enemyPath + "Attack_1.png", FRAME_W, FRAME_H)
 enemyHurt_frames = load_sheet(enemyPath + "Hurt.png", FRAME_W, FRAME_H)
 enemyIdle_frames = load_sheet(enemyPath + "Idle.png", FRAME_W, FRAME_H)
@@ -266,7 +266,7 @@ game_result = ""
 # -----------------------------
 # LOAD PARTNER ANIMATIONS
 # -----------------------------
-partnerPath = "partner/"
+partnerPath = "resources/image/sprites/partner/"
 partner_idle_frames = load_sheet(partnerPath + "Idle.png", FRAME_W, FRAME_H)
 partner_hurt_frames = load_sheet(partnerPath + "Hurt.png", FRAME_W, FRAME_H)
 partner_shot_frames = load_sheet(partnerPath + "Shot.png", FRAME_W, FRAME_H)
@@ -297,7 +297,7 @@ civic_y = partner_y + 55
 # -----------------------------
 def draw_text(surface, text, color, dest, font_name=None, font_size=35):
     if font_name:
-        font = pygame.font.Font("fonts/" + font_name + ".ttf", font_size)
+        font = pygame.font.Font("resources/fonts/" + font_name + ".ttf", font_size)
     else:
         font = pygame.font.SysFont(None, font_size)
     surface.blit(font.render(text, True, color), dest)
@@ -328,7 +328,7 @@ def change_animation(new_action, new_frames):
         current_action = new_action
         current_animation = new_frames
         frame_index = 0.0
-civic_img = pygame.image.load("partner/civic.png").convert_alpha()
+civic_img = pygame.image.load("resources/image/sprites/partner/civic.png").convert_alpha()
 civic_img = pygame.transform.scale(civic_img, (90, 90))
 
 # -----------------------------

@@ -36,9 +36,9 @@ class Game:
             pass
         self.clock = pygame.time.Clock()
         try:
-            self.font = pygame.font.Font("fonts/" + FONT_NAME + ".ttf", FONT_SIZE)
-            self.debug_font = pygame.font.Font("fonts/" + FONT_NAME + ".ttf", 14)
-            self.debug_info_font = pygame.font.Font("fonts/" + FONT_NAME + ".ttf", 16)
+            self.font = pygame.font.Font("resources/fonts/" + FONT_NAME + ".ttf", FONT_SIZE)
+            self.debug_font = pygame.font.Font("resources/fonts/" + FONT_NAME + ".ttf", 14)
+            self.debug_info_font = pygame.font.Font("resources/fonts/" + FONT_NAME + ".ttf", 16)
         except FileNotFoundError:
             self.font = pygame.font.SysFont(None, FONT_SIZE)
             self.debug_font = pygame.font.SysFont(None, 14)
