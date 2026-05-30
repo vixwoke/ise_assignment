@@ -5,12 +5,14 @@ from config import (
     WIDTH, HEIGHT, FPS, FRAME_W, FRAME_H, RAGE_TRIGGER_TIME,
     ENDING_TIME, ESCAPE_TIME, ENDGAME_TIME, ENEMY_TARGET_TIME, MUSIC_PATH,
     MUSIC_VOLUME, FONT_NAME, FONT_SIZE, DEBUG,
-    BG_FULL_PATH, BG_GROUND_PATH, BG_SKY_PATH,
+    BG_SKY_PATH, BG_MOON_PATH, BG_CLOUDS_PATH, BG_ROCKS_PATH, BG_GROUND_PATH,
+    MOON_X, MOON_Y, MOON_SCALE_W,
     PLAYER_CHAR_OFFSET_X, PLAYER_CHAR_OFFSET_Y,
     PLAYER_CHAR_HITBOX_W, PLAYER_CHAR_HITBOX_H,
     ENEMY_CHAR_OFFSET_X, ENEMY_CHAR_OFFSET_Y,
     ENEMY_CHAR_HITBOX_W, ENEMY_CHAR_HITBOX_H,
     DEFAULTBLUE, DEFAULTGREEN, DEFAULTRED, DEFAULTWHITE,
+    GRID_COLOR, GRID_SPACING, GRID_ALPHA,
 )
 from sprites import (
     load_player_anims, load_rage_anims, load_enemy_anims,
@@ -45,10 +47,18 @@ class Game:
             self.debug_font = pygame.font.SysFont(None, 14)
             self.debug_info_font = pygame.font.SysFont(None, 16)
 
-        # Backgrounds (layered, with fallback)
-        self.bg_full = self._load_bg(BG_FULL_PATH, (20, 20, 40))
+        # Backgrounds (layered)
+        self.bg_sky = self._load_bg(BG_SKY_PATH, (20, 20, 40))
+        self.bg_clouds = self._load_bg(BG_CLOUDS_PATH, None, alpha=True)
+        self.bg_rocks = self._load_bg(BG_ROCKS_PATH, None, alpha=True)
         self.bg_ground = self._load_bg(BG_GROUND_PATH, None, alpha=True)
-        self.bg_sky = self._load_bg(BG_SKY_PATH, None, alpha=True)
+
+        moon_raw = pygame.image.load(BG_MOON_PATH).convert_alpha()
+        scale = MOON_SCALE_W / moon_raw.get_width()
+        self.moon_w = int(moon_raw.get_width() * scale)
+        self.moon_h = int(moon_raw.get_height() * scale)
+        self.bg_moon_original = pygame.transform.scale(moon_raw, (self.moon_w, self.moon_h))
+        self.bg_moon = self.bg_moon_original.copy()
 
         # Load assets
         player_anims = load_player_anims()
@@ -79,6 +89,15 @@ class Game:
         self.enemy.regen_timer = self.start_time
         self.partner.last_shot = self.start_time
 
+        # Debug moon toggle with smooth transition
+        self.moon_is_red = False
+        self.moon_current_t = 0.0
+        self.moon_transition_start = 0
+        self.moon_transition_duration = 0
+        self.moon_start_t = 0.0
+        self.moon_target_t = 0.0
+        self.moon_btn_rect = pygame.Rect(WIDTH - 150, 20, 160, 30)
+
         # Ending
         self.ending_triggered = False
         self.can_kill = False
@@ -97,6 +116,43 @@ class Game:
             if fallback_color:
                 surf.fill(fallback_color)
             return surf
+
+    def _apply_moon_color(self, t):
+        self.bg_moon = self.bg_moon_original.copy()
+        gb = int(255 * (1 - t))
+        self.bg_moon.fill((255, gb, gb), None, pygame.BLEND_RGB_MULT)
+
+    def moon_red(self, enable, duration=0):
+        if enable:
+            if duration <= 0:
+                self.moon_current_t = 1.0
+                self._apply_moon_color(1.0)
+                self.moon_transition_duration = 0
+            else:
+                self.moon_transition_start = pygame.time.get_ticks()
+                self.moon_transition_duration = duration
+                self.moon_start_t = self.moon_current_t
+                self.moon_target_t = 1.0
+        else:
+            if duration <= 0:
+                self.moon_current_t = 0.0
+                self._apply_moon_color(0.0)
+                self.moon_transition_duration = 0
+            else:
+                self.moon_transition_start = pygame.time.get_ticks()
+                self.moon_transition_duration = duration
+                self.moon_start_t = self.moon_current_t
+                self.moon_target_t = 0.0
+
+    def _update_moon_transition(self, now):
+        if self.moon_transition_duration <= 0:
+            return
+        elapsed = now - self.moon_transition_start
+        progress = min(elapsed / self.moon_transition_duration, 1.0)
+        self.moon_current_t = self.moon_start_t + (self.moon_target_t - self.moon_start_t) * progress
+        self._apply_moon_color(self.moon_current_t)
+        if progress >= 1.0:
+            self.moon_transition_duration = 0
 
     # Ground detection
     def is_on_ground(self, px, py):
@@ -174,12 +230,17 @@ class Game:
                 return False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    self.player.handle_shoot(self.bullets, moving)
+                    if DEBUG and self.moon_btn_rect.collidepoint(event.pos):
+                        self.moon_is_red = not self.moon_is_red
+                        self.moon_red(self.moon_is_red, 1000)
+                    else:
+                        self.player.handle_shoot(self.bullets, moving)
                 if event.button == 3:
                     self.player.handle_attack()
         return True
 
     def update(self, now):
+        self._update_moon_transition(now)
         keys = pygame.key.get_pressed()
         self.player.handle_movement(keys)
         self.player.handle_jump(keys)
@@ -232,8 +293,11 @@ class Game:
         self.partner.update_animation()
 
     def draw(self, now):
-        # Layered backgrounds
-        self.screen.blit(self.bg_full, (0, 0))
+        # Layered backgrounds: sky → moon → clouds → rocks → ground
+        self.screen.blit(self.bg_sky, (0, 0))
+        self.screen.blit(self.bg_moon, (MOON_X, MOON_Y))
+        self.screen.blit(self.bg_clouds, (0, 0))
+        self.screen.blit(self.bg_rocks, (0, 0))
         self.screen.blit(self.bg_ground, (0, 0))
 
         self.enemy.draw(self.screen, self.player.scale)
@@ -244,6 +308,7 @@ class Game:
         self.bullets.draw_partner_bullets(self.screen)
 
         if DEBUG:
+            self.draw_debug_grid()
             self.draw_debug_ui(now)
             self.draw_debug_rects()
         else:
@@ -297,6 +362,26 @@ class Game:
 
         if self.game_end:
             s.blit(f.render(self.game_result, True, (255, 50, 50)), (WIDTH // 2, HEIGHT // 2))
+
+        # Debug moon toggle button (top-right)
+        btn_color = (255, 100, 100) if self.moon_is_red else (200, 200, 200)
+        pygame.draw.rect(s, btn_color, self.moon_btn_rect)
+        pygame.draw.rect(s, (255, 255, 255), self.moon_btn_rect, 2)
+        s.blit(self.debug_font.render("Test moon switch 1s", True, (0, 0, 0)),
+               (self.moon_btn_rect.x + 6, self.moon_btn_rect.y + 8))
+
+    def draw_debug_grid(self):
+        surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        color = (*GRID_COLOR, GRID_ALPHA)
+        for x in range(0, WIDTH, GRID_SPACING):
+            pygame.draw.line(surf, color, (x, 0), (x, HEIGHT))
+        for y in range(0, HEIGHT, GRID_SPACING):
+            pygame.draw.line(surf, color, (0, y), (WIDTH, y))
+        self.screen.blit(surf, (0, 0))
+        for x in range(0, WIDTH, GRID_SPACING):
+            self.screen.blit(self.debug_font.render(str(x), True, (255, 255, 255)), (x + 2, 2))
+        for y in range(0, HEIGHT, GRID_SPACING):
+            self.screen.blit(self.debug_font.render(str(y), True, (255, 255, 255)), (2, y + 2))
 
     def draw_debug_rects(self):
         p = self.player

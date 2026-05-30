@@ -33,9 +33,9 @@ clock = pygame.time.Clock()
 # -----------------------------
 # LOAD BACKGROUND
 # -----------------------------
-bgFightFull = pygame.image.load("resources/image/sprites/background/night-grass-full.png")
-bgFightGround = pygame.image.load("resources/image/sprites/background/night-grass-ground.png").convert_alpha()
-bgFightSky = pygame.image.load("resources/image/sprites/background/night-grass-sky.png").convert_alpha()
+bgFightFull = pygame.image.load("resources/image/background/night-grass-full.png")
+bgFightGround = pygame.image.load("resources/image/background/night-grass-ground.png").convert_alpha()
+bgFightSky = pygame.image.load("resources/image/background/night-grass-sky.png").convert_alpha()
 
 # -----------------------------
 # LOAD SPRITESHEET

@@ -16,6 +16,11 @@ DEFAULTGREEN = (0, 255, 0)
 DEFAULTRED = (255, 0, 0)
 DEFAULTWHITE = (255, 255, 255)
 
+# Debug grid
+GRID_COLOR = (255, 255, 255)
+GRID_SPACING = 100
+GRID_ALPHA = 40
+
 # Player character offset (whitespace padding in sprite frames)
 PLAYER_CHAR_OFFSET_X = 40
 PLAYER_CHAR_OFFSET_Y = 60
@@ -88,9 +93,17 @@ PARTNER_SPREAD_ANGLES = [-15, 0, 15]
 DEFAULT_SCALE = 1.0
 
 # Backgrounds (layered)
-BG_FULL_PATH = "resources/image/sprites/background/night-grass-full.png"
-BG_GROUND_PATH = "resources/image/sprites/background/night-grass-ground.png"
-BG_SKY_PATH = "resources/image/sprites/background/night-grass-sky.png"
+BG_FULL_PATH = "resources/image/background/night-grass-full.png"
+BG_SKY_PATH = "resources/image/background/night-grass-sky.png"
+BG_MOON_PATH = "resources/image/elements/moon.png"
+BG_CLOUDS_PATH = "resources/image/background/night-grass-clouds.png"
+BG_ROCKS_PATH = "resources/image/background/night-grass-rocks.png"
+BG_GROUND_PATH = "resources/image/background/night-grass-ground.png"
+
+# Moon position
+MOON_X = 700
+MOON_Y = 100
+MOON_SCALE_W = 200
 
 # Font
 FONT_NAME = "vcrosdmono"
