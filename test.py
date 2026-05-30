@@ -1,5 +1,10 @@
 import pygame
 import sys
+import numpy as np
+import cv2
+import pyaudio
+import wave
+from pyscreenrecorder import ScreenRecorder
 import math
 import random
 pygame.init()
