@@ -78,6 +78,7 @@ def load_partner_anims():
     p = PARTNER_PATH
     return {
         "idle": load_sheet(p + "Idle.png"),
+        "walk": load_sheet(p + "Walk.png"),
         "hurt": load_sheet(p + "Hurt.png"),
         "shoot": load_sheet(p + "Shot.png"),
         "dead": load_sheet(p + "Dead.png"),
