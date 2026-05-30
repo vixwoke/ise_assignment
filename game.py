@@ -32,8 +32,8 @@ class Game:
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("maingame.py")
         try:
-            pygame.mixer.music.load(MUSIC_PATH)
-            pygame.mixer.music.set_volume(MUSIC_VOLUME)
+            pygame.mixer.music.load("resources/audio/musics/waking demon.mp3")
+            pygame.mixer.music.set_volume(0.5)
             pygame.mixer.music.play(-1)
         except FileNotFoundError:
             pass
@@ -90,13 +90,8 @@ class Game:
         self.partner.last_shot = self.start_time
 
         # Debug moon toggle with smooth transition
-        self.moon_is_red = False
-        self.moon_current_t = 0.0
-        self.moon_transition_start = 0
-        self.moon_transition_duration = 0
-        self.moon_start_t = 0.0
-        self.moon_target_t = 0.0
-        self.moon_btn_rect = pygame.Rect(WIDTH - 150, 20, 160, 30)
+        self.moon_current_t = 0.2  # blush pink at game start
+        self._apply_moon_color(self.moon_current_t)
 
         # Ending
         self.ending_triggered = False
@@ -119,40 +114,19 @@ class Game:
 
     def _apply_moon_color(self, t):
         self.bg_moon = self.bg_moon_original.copy()
-        gb = int(255 * (1 - t))
-        self.bg_moon.fill((255, gb, gb), None, pygame.BLEND_RGB_MULT)
 
-    def moon_red(self, enable, duration=0):
-        if enable:
-            if duration <= 0:
-                self.moon_current_t = 1.0
-                self._apply_moon_color(1.0)
-                self.moon_transition_duration = 0
-            else:
-                self.moon_transition_start = pygame.time.get_ticks()
-                self.moon_transition_duration = duration
-                self.moon_start_t = self.moon_current_t
-                self.moon_target_t = 1.0
-        else:
-            if duration <= 0:
-                self.moon_current_t = 0.0
-                self._apply_moon_color(0.0)
-                self.moon_transition_duration = 0
-            else:
-                self.moon_transition_start = pygame.time.get_ticks()
-                self.moon_transition_duration = duration
-                self.moon_start_t = self.moon_current_t
-                self.moon_target_t = 0.0
+        green = int(220 - (200 * t))
+        blue = int(220 - (220 * t))
 
-    def _update_moon_transition(self, now):
-        if self.moon_transition_duration <= 0:
-            return
-        elapsed = now - self.moon_transition_start
-        progress = min(elapsed / self.moon_transition_duration, 1.0)
-        self.moon_current_t = self.moon_start_t + (self.moon_target_t - self.moon_start_t) * progress
-        self._apply_moon_color(self.moon_current_t)
-        if progress >= 1.0:
-            self.moon_transition_duration = 0
+        green = max(20, green)
+        blue = max(0, blue)
+
+        self.bg_moon.fill(
+            (255, green, blue),
+            None,
+            pygame.BLEND_RGB_MULT
+        )
+
 
     # Ground detection
     def is_on_ground(self, px, py):
@@ -230,17 +204,21 @@ class Game:
                 return False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    if DEBUG and self.moon_btn_rect.collidepoint(event.pos):
-                        self.moon_is_red = not self.moon_is_red
-                        self.moon_red(self.moon_is_red, 1000)
-                    else:
                         self.player.handle_shoot(self.bullets, moving)
                 if event.button == 3:
                     self.player.handle_attack()
         return True
 
     def update(self, now):
-        self._update_moon_transition(now)
+        elapsed = now - self.start_time
+
+        # Moon slowly becomes blood red
+        progress = min(elapsed / RAGE_TRIGGER_TIME, 1.0)
+
+        # Start at blush (0.2) and reach blood red (1.0)
+        self.moon_current_t = 0.2 + (0.8 * progress)
+
+        self._apply_moon_color(self.moon_current_t)
         keys = pygame.key.get_pressed()
         self.player.handle_movement(keys)
         self.player.handle_jump(keys)
@@ -362,13 +340,6 @@ class Game:
 
         if self.game_end:
             s.blit(f.render(self.game_result, True, (255, 50, 50)), (WIDTH // 2, HEIGHT // 2))
-
-        # Debug moon toggle button (top-right)
-        btn_color = (255, 100, 100) if self.moon_is_red else (200, 200, 200)
-        pygame.draw.rect(s, btn_color, self.moon_btn_rect)
-        pygame.draw.rect(s, (255, 255, 255), self.moon_btn_rect, 2)
-        s.blit(self.debug_font.render("Test moon switch 1s", True, (0, 0, 0)),
-               (self.moon_btn_rect.x + 6, self.moon_btn_rect.y + 8))
 
     def draw_debug_grid(self):
         surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)

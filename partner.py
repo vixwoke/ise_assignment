@@ -8,7 +8,7 @@ from config import (
 class Partner:
     def __init__(self, anims):
         self.x = 30
-        self.y = HEIGHT - 180
+        self.y = HEIGHT // 1.9
         self.hp = PARTNER_HP
         self.dead = False
 
@@ -60,25 +60,5 @@ class Partner:
         )
         screen.blit(frame, (self.x, self.y))
 
-    # Gravity
-    def update_gravity(self, is_on_ground_fn):
-        self.fall_speed += GRAVITY
-        self.y += self.fall_speed
 
-        feet_x = int(self.x + (FRAME_W / 2 - PLAYER_CHAR_OFFSET_X) * self.scale)
-        feet_y = int(self.y + (FRAME_H - PLAYER_CHAR_OFFSET_Y) * self.scale)
 
-        if is_on_ground_fn(feet_x, feet_y):
-            while is_on_ground_fn(int(feet_x), int(feet_y)):
-                feet_y -= 1
-            self.y = feet_y - (FRAME_H - PLAYER_CHAR_OFFSET_Y) * self.scale
-            self.fall_speed = 0
-            self.on_ground = True
-        else:
-            self.on_ground = False
-
-    def handle_jump(self, keys):
-        if self.can_walk() and keys[pygame.K_SPACE] and self.on_ground:
-            self.fall_speed = JUMP_FORCE
-            self.set_animation("jump", self.anims["jump"])
-            self.on_ground = False
