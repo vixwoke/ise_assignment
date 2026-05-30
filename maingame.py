@@ -24,6 +24,11 @@ pygame.mixer.music.play(-1)
 clock = pygame.time.Clock()
 
 # -----------------------------
+# LOAD BACKGROUND
+# -----------------------------
+bgGrassGround = pygame.image.load("background/grass-ground-1.png")
+
+# -----------------------------
 # LOAD SPRITESHEET
 # -----------------------------
 def load_sheet(path, frame_width, frame_height):
@@ -1687,7 +1692,7 @@ while running:
     # DRAW
     # -----------------------------
 
-    screen.fill((30, 30, 30))
+    screen.blit(bgGrassGround, (0, 0))
 
     # DRAW ENEMY
     enemy_frame = enemy_animation[
