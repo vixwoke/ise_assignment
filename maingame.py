@@ -157,11 +157,11 @@ rage_trigger_time = 89000 #1.29minute
 # -----------------------------
 # SHOOT SYSTEM
 # -----------------------------
-shots = 0
-max_shots = 12
+fullMag = 12
+shots = fullMag
 recharging = False
 recharge_start = 0
-recharge_time = 2000
+recharge_time = 1300
 
 # -----------------------------
 # BULLETS
@@ -511,12 +511,12 @@ while running:
                 # NORMAL MODE SHOOT
                 if not rage_mode:
                     if can_shoot() and not moving:
-                        if shots >= max_shots:
+                        if shots <= 0 :
                             recharging = True
                             recharge_start = pygame.time.get_ticks()
                             change_animation("recharge", recharge_frames)
                         else:
-                            shots += 1
+                            shots -= 1
                             change_animation("shoot", shot_frames)
                             bullet_x = x + FRAME_W // 2
                             bullet_y = y + 90
@@ -728,7 +728,7 @@ while running:
     if recharging:
         if now - recharge_start >= recharge_time:
             recharging = False
-            shots = 0
+            shots = fullMag
             if current_action == "recharge":
                 change_animation("idle", idle_frames)
     # -----------------------------
@@ -1126,7 +1126,7 @@ while running:
     # -----------------------------
     # UI
     # -----------------------------
-    draw_text(screen, f"Shots: {shots}/{max_shots}", (255, 255, 255), (20, 20), "vcrosdmono", 35)
+    draw_text(screen, f"Shots: {shots}/{fullMag}", (255, 255, 255), (20, 20), "vcrosdmono", 35)
     draw_text(screen, f"Action: {current_action}", (255, 255, 0), (20, 60), "vcrosdmono", 35)
     draw_text(screen, f"Enemy: {enemy_action}", (255, 100, 100), (20, 100), "vcrosdmono", 35)
     draw_text(screen, f"Player HP: {int(player_hp)}", (100, 255, 100), (20, 140), "vcrosdmono", 35)
