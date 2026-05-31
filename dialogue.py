@@ -27,6 +27,10 @@ class NarrativeEngine:
                 "John: The moon... why is it glowing pink?",
                 "John: Ugh, my head... my blood feels like it's boiling!",
                 "John: Something is under my skin... ARGHHH!"
+            ],
+            "panic": [
+                "John: It's happening again... I can't stop it.",
+                "John: The darkness... it's taking over everything!"
             ]
         }
 
@@ -64,28 +68,27 @@ class NarrativeEngine:
             self.next_line()
 
     def draw(self):
-
         if not self.is_active:
             return
 
-        # 1. Setup Text Box Dimensions
-        box_height = 140
-        box_rect = pygame.Rect(100, HEIGHT - box_height - 40, WIDTH - 200, box_height)
 
-        # 2. Draw Semi-Transparent Dark Background
-        overlay = pygame.Surface((box_rect.width, box_rect.height))
-        overlay.set_alpha(220)
-        overlay.fill((10, 10, 15))
-        self.screen.blit(overlay, (box_rect.x, box_rect.y))
+        smaller_font = pygame.font.Font(None, 28)
 
-        # 3. Draw a Silver Border
-        pygame.draw.rect(self.screen, (200, 200, 200), box_rect, 2)
 
-        # 4. Render the Current Dialogue Line
         current_text = self.script[self.active_beat][self.line_index]
-        text_surf = self.font.render(current_text, True, (255, 255, 255))
-        self.screen.blit(text_surf, (box_rect.x + 30, box_rect.y + 40))
 
-        # 5. Draw the "Press SPACE" prompt at the bottom right
-        prompt_surf = self.font.render("Press SPACE...", True, (150, 50, 50))
-        self.screen.blit(prompt_surf, (box_rect.right - 200, box_rect.bottom - 40))
+
+        shadow_surf = smaller_font.render(current_text, True, (255, 255, 255))
+        text_surf = smaller_font.render(current_text, True, (139, 0, 0))
+
+
+        text_rect = text_surf.get_rect(center=(WIDTH // 2, 50))
+        shadow_rect = shadow_surf.get_rect(center=(WIDTH // 2 + 2, 52))  # Slight offset
+
+
+        self.screen.blit(shadow_surf, shadow_rect)
+        self.screen.blit(text_surf, text_rect)
+
+
+        prompt_surf = smaller_font.render("Press SPACE to continue", True, (200, 200, 200))
+        self.screen.blit(prompt_surf, (WIDTH - 250, HEIGHT - 30))
