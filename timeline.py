@@ -27,31 +27,33 @@ class TimelineManager:
         self._setup_events()
 
     def _setup_events(self):
-        # Event 1: Enemy March
+        # T=2s: Start targeting Civic first
         def trigger_enemy_march(game):
-            if not game.enemy.march:
-                game.enemy.march = True
-
-        # Event 2: Enemy targets partner
-        def trigger_enemy_phase_1(game):
-            game.target_partner = True
+            game.enemy.mode = "march"
             game.enemy.phase = 1
+            game.target_partner = True
 
-        # Event 3: Player Rage Mode
+        # T=74s: Pivot to targeting Partner second
+        def trigger_enemy_phase_1(game):
+            game.enemy.mode = "march"
+            game.enemy.phase = 2
+            game.target_partner = True
+
+        # T=84s: Switch to active chase hunting the player during Rage Mode
         def trigger_rage_mode(game):
             if not game.player.rage_mode:
                 game.player.activate_rage()
                 game.enemy.hp = game.enemy.max_hp
                 game.enemy.make_normal()
                 game.player.hp = game.player.max_hp
+                game.enemy.mode = "chase"
+                game.enemy.phase = 0
 
-        # Event 4: Ending Sequence Triggered
         def trigger_ending(game):
             if not game.ending_triggered:
                 game.ending_triggered = True
                 game.enemy.locked = False
 
-        # Event 5: Enemy Escape Starts
         def trigger_enemy_escape(game):
             if game.ending_triggered and not game.enemy.dead:
                 game.enemy.escape = True
@@ -68,11 +70,9 @@ class TimelineManager:
     def update(self, now):
         elapsed = now - self.game.start_time
 
-        # End game sequence check (equivalent to ENDGAME_TIME check)
         if elapsed >= ENDGAME_TIME:
             return False
 
-        # Update and check all registered events
         for event in self.events:
             event.check_and_trigger(elapsed, self.game)
 

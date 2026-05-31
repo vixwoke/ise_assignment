@@ -9,7 +9,6 @@ from config import (
     ENEMY_CHAR_HITBOX_W, ENEMY_CHAR_HITBOX_H,
 )
 
-
 class Enemy:
     def __init__(self, normal_anims, wounded_shoot_anims, wounded_scar_anims):
         self.x = WIDTH // 2 + ENEMY_CHAR_OFFSET_X
@@ -37,20 +36,20 @@ class Enemy:
         self.march = False
         self.locked = False
         self.escape = False
+        self.mode = "chase"
 
-        self.waiting_after_civic = False
-
-        # Phase control
-        self.phase = 0  # 0 = civic, 1 = partner
+        self.phase = 0
 
         self.fall_speed = 0
         self.on_ground = False
+        self.waiting_after_civic = False
 
     @property
     def rect(self):
         return pygame.Rect(self.x, self.y, ENEMY_CHAR_HITBOX_W, ENEMY_CHAR_HITBOX_H)
 
     def set_animation(self, action, frames):
+        # Restored guard condition to prevent animations from freezing on frame 0
         if self.action != action:
             self.action = action
             self.animation = frames
@@ -60,12 +59,8 @@ class Enemy:
     def make_wounded(self):
         if self.wounded:
             return
-
         self.wounded = True
-
-        # Default wounded sprite before rage
         self.anims = dict(self.wounded_shoot_anims)
-
         self.animation = self.anims["hurt"]
         self.frame_index = 0.0
 
@@ -113,47 +108,54 @@ class Enemy:
         else:
             self.on_ground = False
 
-    def update_march(self, now, player_x, partner_x, partner_y, partner_dead,
-                     civic_x, civic_y, target_partner, civic_hit, scale, is_scene_1=False):
+    def update_march(self, now, partner_x, partner_y, partner_dead,
+                     civic_x, civic_y, target_partner, civic_hit, scale, player_x, is_scene_1=False):
 
-        if not self.march or self.dead or self.locked:
+        self.march = (self.mode == "march")
+
+        if self.dead or self.locked:
             return civic_x, civic_y, target_partner, civic_hit
 
-        # Switch phase after civic hit
-        if self.waiting_after_civic:
-            self.phase = 1
+        if self.waiting_after_civic and not is_scene_1:
+            self.phase = 2
             target_partner = True
             self.waiting_after_civic = False
 
-        # Escape
         if self.escape:
             self.x -= ESCAPE_SPEED
             self.set_animation("run", self.anims["run"])
             self.facing_right = False
             return civic_x, civic_y, target_partner, civic_hit
 
-        # Partner dead - continue attacking on a timer
-        if partner_dead and target_partner:
-            if now - self.attack_timer >= ENEMY_ATTACK_INTERVAL:
-                self.attack_timer = now
-                self.set_animation("attack", self.anims["attack"])
-                self.has_hit_partner = False
-            return civic_x, civic_y, target_partner, civic_hit
+        if partner_dead and self.phase == 2 and not is_scene_1:
+            self.phase = 0
+            target_partner = False
 
-        # Targeting
+            if self.action != "idle":
+                self.set_animation("idle", self.anims["idle"])
+
+        # TARGETING PATHWAYS
         if is_scene_1:
             tx = player_x
-        elif partner_dead:
+            target_partner = False
+            self.phase = 0
+        elif self.mode == "chase":
             tx = player_x
-        elif self.phase == 1:
-            tx = partner_x
-        else:
-            tx = civic_x
+            target_partner = False
+            self.phase = 0
+        elif self.mode == "march":
+            target_partner = True
+
+            if self.phase == 1:
+                tx = civic_x
+            elif self.phase == 2:
+                tx = partner_x
+            else:
+                tx = player_x
 
         dx = tx - self.x
         distance = abs(dx)
 
-        # Move on X axis only
         if distance > 60:
             self.x += ENEMY_SPEED if dx > 0 else -ENEMY_SPEED
             self.action = "walk"
@@ -164,11 +166,19 @@ class Enemy:
                 self.set_animation("attack", self.anims["attack"])
 
             current_frame = int(self.frame_index)
-            if current_frame == 4 and not civic_hit and not is_scene_1:
+
+            if current_frame == 4 and not civic_hit and distance <= 80 and self.mode == "march" and not is_scene_1:
                 civic_x += 100
                 civic_y += 100
                 civic_hit = True
-                self.waiting_after_civic = True
+                self.phase = 2
+
+                current_frame = int(self.frame_index)
+                if current_frame == 4 and not civic_hit:
+                    civic_x += 100
+                    civic_y += 100
+                    civic_hit = True
+                    self.waiting_after_civic = True
 
         return civic_x, civic_y, target_partner, civic_hit
 
