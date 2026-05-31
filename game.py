@@ -6,6 +6,7 @@ from config import (
     WIDTH, HEIGHT, FPS, FRAME_W, FRAME_H,
     ENDING_TIME, ESCAPE_TIME, ENDGAME_TIME, ENEMY_TARGET_TIME, MUSIC_PATH,
     MUSIC_VOLUME, FONT_NAME, FONT_SIZE, DEBUG, PARTNER_DEATH_PAUSE,
+    ESCAPE_SPEED,RAGE_TRIGGER_TIME, RAGE_SCALE,ENEMY_PHASE_1_TIME,
     BG_SKY_PATH, BG_MOON_PATH, BG_CLOUDS_PATH, BG_ROCKS_PATH, BG_GROUND_PATH,
     MOON_X, MOON_Y, MOON_SCALE_W,
     PLAYER_CHAR_OFFSET_X, PLAYER_CHAR_OFFSET_Y,
@@ -104,8 +105,15 @@ class Game:
         self.enemy.regen_timer = self.start_time
         self.partner.last_shot = self.start_time
 
+        #Transition
+        self.fade_alpha = 0
+        self.fade_state = "none" # Options: "none", "fading_out", "black", "fading_in"
+        self.fade_timer = 0
+        self.enemy_fleeing = False
+
         # Debug moon toggle with smooth transition
-        self.moon_is_red = False
+        self.moon_is_red = True
+        self.moon_red(True)  # Start with red moon
         self.moon_current_t = 0.0
         self.moon_transition_start = 0
         self.moon_transition_duration = 0
@@ -392,11 +400,46 @@ class Game:
         return True
 
     def update(self, now):
+        # 1. Environmental and transition tick updates
         self._update_lightning(now)
         self._update_moon_transition(now)
+
+        # 2. Handle first scene scripted flee sequence
+        if self.enemy_fleeing:
+            self.enemy.x += ESCAPE_SPEED
+            
+            # Safeguard: Ensures set_animation runs only once, preventing frozen frame indexes
+            if self.enemy.action != "run":
+                self.enemy.set_animation("run", self.enemy.anims["run"])
+            self.enemy.facing_right = True
+
+            # Initiate screen fade-out once the enemy is fully off-screen right
+            if self.enemy.x > WIDTH + 150 and self.fade_state == "none":
+                self.fade_state = "fading_out"
+                self.fade_timer = now
+
+        # 3. Handle black screen fade transitions
+        if self.fade_state == "fading_out":
+            elapsed = now - self.fade_timer
+            self.fade_alpha = min(255, int((elapsed / 1000.0) * 255))
+            if elapsed >= 1000:
+                self.fade_state = "black"
+                self.fade_timer = now
+                self.transition_to_next_scene()
+
+        elif self.fade_state == "fading_in":
+            elapsed = now - self.fade_timer
+            self.fade_alpha = max(0, 255 - int((elapsed / 1000.0) * 255))
+            if elapsed >= 1000:
+                self.fade_state = "none"
+                self.fade_alpha = 0
+
+        # 4. Global State Changes (e.g. Rage Mode moon color)
         if self.player.rage_mode and not self.moon_is_red:
             self.moon_is_red = True
-            self.moon_red(True, 2000)
+            self.moon_red(True, 2000)  # Smooth transition to red over 2 seconds
+
+        # 5. Physics, movement, and player input loop
         keys = pygame.key.get_pressed()
         self.player.handle_movement(keys)
         self.player.handle_jump(keys)
@@ -404,36 +447,37 @@ class Game:
         self.player.update_gravity(self.is_on_ground)
         self.player.clamp_to_screen()
         self.player.update_regen(now)
-        # --- PLAYER DEATH LOGIC ---
+
+        # Player death criteria
         if self.player.dead:
-            # Wait for the body to hit the floor, then GAME OVER
             if self.player.frame_index >= len(self.player.animation) - 1:
                 self.game_end = True
                 self.game_result = "YOU DIED"
 
-        # --- DAMAGE FLASH EFFECT ---
+        # Screen damage flash intensity
         if now - self.player.last_hit_time < 150 and self.player.hp > 0:
             self.damage_flash_alpha = 100
             self.shake_frames = 10
         else:
-            self.damage_flash_alpha = max(0, self.damage_flash_alpha - 5)  # Fade out smoothly
-        #rain
+            self.damage_flash_alpha = max(0, self.damage_flash_alpha - 5)
+
+        # Ambient rain calculation
         for drop in self.rain_drops:
-            drop[0] += drop[2] // 4  # Wind pushes rain slightly right
-            drop[1] += drop[2]  # Rain falls down
+            drop[0] += drop[2] // 4
+            drop[1] += drop[2]
             if drop[1] > HEIGHT or drop[0] > WIDTH:
                 drop[0] = random.randint(-200, WIDTH)
                 drop[1] = random.randint(-200, 0)
-        # Player bullets
+
+        # 6. Combat Projectiles and Hitboxes
         if self.bullets.update_player_bullets(self.enemy.rect):
             if not self.enemy.dead:
                 self.enemy.hurt_from_damage()
 
-        # Attack / leap damage
         self.handle_player_attack_hit()
         self.handle_leap_attack_hit()
 
-        # Enemy AI
+        # 7. Enemy Behavior Loop
         self.enemy.update_gravity(self.is_on_ground, self.player.scale)
         self.enemy.update_auto_attack(now)
         self.civic_x, self.civic_y, self.target_partner, self.civic_hit = \
@@ -445,25 +489,25 @@ class Game:
                 self.player.x,
             )
 
-        # Enemy escape end
+        # Check for enemy victory condition
         if self.enemy.escape and self.enemy.x < -200:
             self.game_end = True
             self.game_result = "ENEMY ESCAPED"
 
-        # Enemy damage
+        # Combat calculations
         self.enemy.damage_player(self.player, now)
         if self.target_partner:
             self.enemy.damage_partner(self.partner, now)
 
         self.enemy.update_regen(now)
 
-        # Partner
+        # 8. Partner Behavior Loop
         self.partner.try_shoot(now, self.bullets, self.enemy.x, self.enemy.y)
         if self.bullets.update_partner_bullets(self.enemy.rect):
             if not self.enemy.dead:
                 self.enemy.hurt_from_damage()
 
-        # Partner death → 2s pause → back to player chase
+        # Manage partner state transition delays upon defeat
         if self.partner.dead and not self.partner_death_handled:
             self.partner_death_handled = True
             self.partner_death_time = now
@@ -474,13 +518,50 @@ class Game:
             self.target_partner = False
             self.enemy.phase = 0
 
-
-        # Animations
+        # 9. Sprite Sheet and Animation ticks (exactly once per loop cycle)
         self.enemy.update_wounded_sprite(self.player.rage_mode)
         self.player.update_wounded_sprite()
         self.player.update_animation()
         self.enemy.update_animation()
         self.partner.update_animation()
+    
+    def transition_to_next_scene(self):
+        """Resets combat states and positions entities for Phase 2 without activating Rage Mode yet."""
+        now = pygame.time.get_ticks() - self.total_paused_time
+
+        # 1. Restore Player vitals without triggering Rage Mode prematurely
+        self.player.hp = self.player.max_hp
+        self.player.dead = False
+        if self.player.action == "dead":
+            self.player.set_animation("idle", self.player.anims["idle"])
+
+        # 2. Reset and configure the enemy for the second fight
+        self.enemy_fleeing = False
+        self.enemy.locked = False
+        self.enemy.escape = False
+        self.enemy.hp = self.enemy.max_hp
+        self.enemy.make_normal()
+
+        # Re-position entities
+        self.enemy.x = WIDTH - 200
+        self.enemy.y = HEIGHT // 2 + ENEMY_CHAR_OFFSET_Y
+        self.enemy.facing_right = False
+        self.enemy.set_animation("idle", self.enemy.anims["idle"])
+
+        self.player.x = WIDTH // 4 + PLAYER_CHAR_OFFSET_X
+        self.player.facing_right = True
+
+        # Clean active projectiles
+        self.bullets.player_bullets = []
+        self.bullets.partner_bullets = []
+
+        # 3. Position timeline clock right after the first phase transition
+        # This permits 10 seconds of normal combat before Rage Mode naturally triggers at 84 seconds (RAGE_TRIGGER_TIME)
+        self.start_time = now - ENEMY_PHASE_1_TIME
+
+        # 4. Initiate fade-in
+        self.fade_state = "fading_in"
+        self.fade_timer = now
 
     def draw(self, now):
         # Layered backgrounds: sky → moon → clouds → rocks → ground
@@ -529,6 +610,13 @@ class Game:
             shake_copy = self.screen.copy()
             self.screen.fill((0, 0, 0))
             self.screen.blit(shake_copy, (shake_offset_x, shake_offset_y))
+
+        # 5 Draw the black fade-to-black transition overlay
+        if self.fade_alpha > 0:
+            fade_surf = pygame.Surface((WIDTH, HEIGHT))
+            fade_surf.fill((0, 0, 0))
+            fade_surf.set_alpha(self.fade_alpha)
+            self.screen.blit(fade_surf, (0, 0))
 
 
         if self.debug_enabled:
