@@ -8,6 +8,7 @@ from config import (
     GRAVITY, JUMP_FORCE,
     PLAYER_CHAR_OFFSET_X, PLAYER_CHAR_OFFSET_Y,
     PLAYER_CHAR_HITBOX_W, PLAYER_CHAR_HITBOX_H,
+    AIR_SPEED,
 )
 
 
@@ -79,10 +80,10 @@ class Player:
 
     # Action predicates
     def can_walk(self):
-        return self.action not in ["shoot", "attack", "recharge", "hurt", "dead"]
+        return self.action not in ["recharge", "hurt", "dead"]
 
     def can_shoot(self):
-        return self.action not in ["shoot", "attack", "recharge", "jump", "hurt", "dead"]
+        return self.action not in ["shoot", "attack", "recharge", "hurt", "dead"]
 
     def can_attack(self):
         return self.action not in ["shoot", "attack", "jump", "hurt", "dead"]
@@ -153,7 +154,7 @@ class Player:
             self.on_ground = False
 
     def handle_jump(self, keys):
-        if self.can_walk() and keys[pygame.K_SPACE] and self.on_ground:
+        if self.can_walk() and self.action not in ["attack"] and keys[pygame.K_SPACE] and self.on_ground:
             self.fall_speed = JUMP_FORCE
             self.set_animation("jump", self.anims["jump"])
             self.on_ground = False
@@ -162,14 +163,15 @@ class Player:
     def handle_movement(self, keys):
         if not self.can_walk():
             return
+        speed = AIR_SPEED if not self.on_ground else self.speed
         dx = 0
         moving = False
         if keys[pygame.K_a]:
-            dx = -self.speed
+            dx = -speed
             moving = True
             self.facing_right = False
         if keys[pygame.K_d]:
-            dx = self.speed
+            dx = speed
             moving = True
             self.facing_right = True
         self.x += dx
@@ -181,7 +183,7 @@ class Player:
 
     def handle_shoot(self, bullet_manager, moving):
         if not self.rage_mode:
-            if self.can_shoot() and not moving:
+            if self.can_shoot():
                 if self.shots <= 0:
                     self.recharging = True
                     self.recharge_start = pygame.time.get_ticks()
