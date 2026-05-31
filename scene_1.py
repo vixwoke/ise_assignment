@@ -7,14 +7,17 @@ from config import (
 class Scene1Manager:
     def __init__(self, game):
         self.game = game
-        self.phase = "intro_walk"
+        self.phase = "intro_idle"  # Start directly in "intro_idle" to bypass walking entrance
         self.start_time = pygame.time.get_ticks()
         self.phase_timer = self.start_time
         self.combat_start_time = None
 
-        # Start positions off-screen
-        self.game.player.x = -150
-        self.game.partner.x = -250
+        # Position characters instantly at their final locations
+        self.game.player.x = WIDTH // 4 + PLAYER_CHAR_OFFSET_X
+        self.game.partner.x = 30
+        self.game.partner.y = self.game.civic_y  # Align Partner's Y position to match the Civic's Y
+
+        # Enemy starts off-screen right
         self.game.enemy.x = WIDTH + 300
 
         # Reset any active bullets
@@ -26,45 +29,21 @@ class Scene1Manager:
         self.fade_surface.fill((0, 0, 0))
         self.fade_alpha = 0
 
+        # Make the moon red instantly at the start of Scene 1
+        self.game.moon_red(True, 0)
+
     def update(self, now):
         # 30-second countdown check starting specifically after interactive combat begins
         if self.phase == "combat" and self.combat_start_time:
             if now - self.combat_start_time >= 30000:
-                self.phase = "enemy_escape"
+                self.phase = "pre_escape"
                 self.phase_timer = now
                 self.game.enemy.march = False
+                self.game.enemy.locked = True
+                self.game.enemy.set_animation("idle", self.game.enemy.anims["idle"])
+                self.game.moon_red(False, 2000)  # Transition moon back to normal over 2 seconds
 
-        if self.phase == "intro_walk":
-            target_player_x = WIDTH // 4 + PLAYER_CHAR_OFFSET_X
-            target_partner_x = 30
-
-            player_reached = False
-            partner_reached = False
-
-            # Move Player
-            if self.game.player.x < target_player_x:
-                self.game.player.x += PLAYER_SPEED
-                self.game.player.set_animation("walk", self.game.player.anims["walk"])
-                self.game.player.facing_right = True
-            else:
-                self.game.player.set_animation("idle", self.game.player.anims["idle"])
-                player_reached = True
-
-            # Move Partner
-            if self.game.partner.x < target_partner_x:
-                self.game.partner.x += PLAYER_SPEED
-                self.game.partner.set_animation("walk", self.game.partner.anims["walk"])
-            else:
-                self.game.partner.set_animation("idle", self.game.partner.anims["idle"])
-                partner_reached = True
-
-            self.game.enemy.x = WIDTH + 300
-
-            if player_reached and partner_reached:
-                self.phase = "intro_idle"
-                self.phase_timer = now
-
-        elif self.phase == "intro_idle":
+        if self.phase == "intro_idle":
             self.game.player.set_animation("idle", self.game.player.anims["idle"])
             self.game.partner.set_animation("idle", self.game.partner.anims["idle"])
             self.game.enemy.x = WIDTH + 300
@@ -94,10 +73,22 @@ class Scene1Manager:
             if now - self.phase_timer >= 3000:
                 self.phase = "combat"
                 self.combat_start_time = now
-                self.game.enemy.march = True
+                self.game.enemy.march = True  # Enable pathfinding for combat
 
         elif self.phase == "combat":
             pass
+
+        elif self.phase == "pre_escape":
+            # Force characters to stay in their idle states during transition
+            self.game.enemy.set_animation("idle", self.game.enemy.anims["idle"])
+            self.game.player.set_animation("idle", self.game.player.anims["idle"])
+            self.game.partner.set_animation("idle", self.game.partner.anims["idle"])
+
+            # Wait 2 seconds for the transition to finish
+            if now - self.phase_timer >= 2000:
+                self.game.enemy.locked = False
+                self.phase = "enemy_escape"
+                self.phase_timer = now
 
         elif self.phase == "enemy_escape":
             # Enemy runs away to the right

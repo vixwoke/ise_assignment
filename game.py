@@ -293,10 +293,6 @@ class Game:
         self.partner = Partner(partner_anims)
         self.bullets = BulletManager()
         self.timeline = TimelineManager(self)
-
-        # Relocate the civic to y 490 in the next scene
-        self.civic_x = self.partner.x + 60
-        self.civic_y = 490
         
         self.civic_hit = False
         self.target_partner = False
@@ -447,12 +443,15 @@ class Game:
         return True
 
     def update(self, now):
+        # Unconditionally update atmospheric effects first
+        self._update_lightning(now)
+        self._update_moon_transition(now)
+
         if self.current_scene == "scene_1":
             self.scene1.update(now)
             # Apply normal physics and animation ticks during intro timeline phases
             if self.scene1.phase != "combat":
                 self.player.update_gravity(self.is_on_ground)
-                self.partner.update_gravity(self.is_on_ground)
                 self.enemy.update_gravity(self.is_on_ground, self.player.scale)
                 self.player.update_animation()
                 self.enemy.update_animation()
@@ -460,8 +459,6 @@ class Game:
                 return
 
         # General calculations loop
-        self._update_lightning(now)
-        self._update_moon_transition(now)
         keys = pygame.key.get_pressed()
         self.player.handle_movement(keys)
         self.player.handle_jump(keys)
@@ -541,9 +538,7 @@ class Game:
         self.player.draw(self.screen)
         self.bullets.draw_player_bullets(self.screen)
 
-        # Hide the civic vehicle during Scene 1
-        if self.current_scene != "scene_1":
-            self.screen.blit(self.civic_img, (self.civic_x, self.civic_y))
+        self.screen.blit(self.civic_img, (self.civic_x, self.civic_y))
 
         self.partner.draw(self.screen)
         self.bullets.draw_partner_bullets(self.screen)
@@ -664,8 +659,6 @@ class Game:
                 (p.rect, DBG_PC, "Player Char"),
                 (ef_rect, DBG_EF, "Enemy Frame"),
                 (e.rect, DBG_EC, "Enemy Char"),
-                (pt_rect, (0, 255, 255), "Partner Frame"),
-                (self.partner.rect, (0, 150, 255), "Partner Char"),
             ]
         else:
             rect_list = [
