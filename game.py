@@ -1,6 +1,5 @@
 from timeline import TimelineManager
 import pygame
-import random
 import sys
 from config import (
     WIDTH, HEIGHT, FPS, FRAME_W, FRAME_H,
@@ -112,15 +111,6 @@ class Game:
         # Partner death tracking
         self.partner_death_handled = False
         self.partner_death_time = 0
-
-        # Partner death tracking
-        self.partner_death_handled = False
-        self.partner_death_time = 0
-
-        # Moon flickering
-        self.moon_flicker_active = False
-        self.moon_flicker_timer = 0
-        self.moon_flicker_red = False
 
         # Ending
         self.ending_triggered = False
@@ -350,7 +340,7 @@ class Game:
             self.enemy.update_march(
                 now, self.partner.x, self.partner.y, self.partner.dead,
                 self.civic_x, self.civic_y, self.target_partner, self.civic_hit,
-                self.player.scale, self.player.x,
+                self.player.scale,
             )
 
         # Enemy escape end
