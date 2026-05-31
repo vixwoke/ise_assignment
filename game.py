@@ -114,12 +114,8 @@ class Game:
 
         # Debug moon toggle with smooth transition
         self.moon_is_red = True
-        self.moon_red(True)  # Start with red moon
-        self.moon_current_t = 0.0
-        self.moon_transition_start = 0
-        self.moon_transition_duration = 0
-        self.moon_start_t = 0.0
-        self.moon_target_t = 0.0
+        self.moon_red(True)
+        self.moon_red(False, ENEMY_PHASE_1_TIME)
         self.moon_btn_rect = pygame.Rect(WIDTH - 150, 55, 160, 30)
 
         # Lightning animation (sky & clouds flash)
@@ -437,11 +433,6 @@ class Game:
                 self.fade_state = "none"
                 self.fade_alpha = 0
 
-        # 4. Global State Changes (e.g. Rage Mode moon color)
-        if self.player.rage_mode and not self.moon_is_red:
-            self.moon_is_red = True
-            self.moon_red(True, 2000)  # Smooth transition to red over 2 seconds
-
         # 5. Physics, movement, and player input loop
         keys = pygame.key.get_pressed()
         self.player.handle_movement(keys)
@@ -600,6 +591,9 @@ class Game:
         self.player.facing_right = True
 
         self.level = 2
+        # Reset moon to white for Scene 2
+        self.moon_is_red = False
+        self.moon_red(False)
 
         # Clean active projectiles
         self.bullets.player_bullets = []

@@ -37,11 +37,7 @@ class TimelineManager:
             game.target_partner = True
         
         def trigger_enemy_flee_transition(game):
-            # 1. Slowly return the moon's hue back to normal
-            game.moon_is_red = False
-            game.moon_red(False, 5000)
-
-            # 2. Trigger the flee sequence
+            # Trigger the flee sequence
             game.enemy_fleeing = True
             game.enemy.locked = True  # Locks pathfinding AI to allow scripted flee logic
             game.enemy.facing_right = True
@@ -69,6 +65,12 @@ class TimelineManager:
         self.events.append(TimelineEvent(ENEMY_TARGET_TIME, trigger_enemy_march))
         self.events.append(TimelineEvent(ENEMY_PHASE_1_TIME, trigger_enemy_phase_1))
         self.events.append(TimelineEvent(ENEMY_PHASE_1_TIME, trigger_enemy_flee_transition))
+        def trigger_moon_red_before_rage(game):
+            if not game.moon_is_red:
+                game.moon_is_red = True
+                game.moon_red(True, 2000)
+
+        self.events.append(TimelineEvent(RAGE_TRIGGER_TIME - 2000, trigger_moon_red_before_rage))
         self.events.append(TimelineEvent(RAGE_TRIGGER_TIME, trigger_rage_mode))
         self.events.append(TimelineEvent(ENDING_TIME, trigger_ending))
         self.events.append(TimelineEvent(ESCAPE_TIME, trigger_enemy_escape))
