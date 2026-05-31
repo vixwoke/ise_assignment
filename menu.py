@@ -38,7 +38,7 @@ class MainMenu:
         # Menu Background Music
         try:
             pygame.mixer.music.load("resources/audio/musics/menu_theme.wav")
-            pygame.mixer.music.set_volume(0.4)
+            pygame.mixer.music.set_volume(0.5)
             pygame.mixer.music.play(-1)
         except FileNotFoundError:
             pass

@@ -110,6 +110,7 @@ class Game:
         self.fade_state = "none" # Options: "none", "fading_out", "black", "fading_in"
         self.fade_timer = 0
         self.enemy_fleeing = False
+        self.interlude_pending = False
 
         # Debug moon toggle with smooth transition
         self.moon_is_red = True
@@ -129,6 +130,8 @@ class Game:
         self.lightning_remaining_flashes = 0
         self.lightning_cloud_delay = 0
 
+        # Level tracking
+        self.level = 1
         # Partner death tracking
         self.partner_death_handled = False
         self.partner_death_time = 0
@@ -425,7 +428,7 @@ class Game:
             if elapsed >= 1000:
                 self.fade_state = "black"
                 self.fade_timer = now
-                self.transition_to_next_scene()
+                self.interlude_pending = True
 
         elif self.fade_state == "fading_in":
             elapsed = now - self.fade_timer
@@ -525,6 +528,51 @@ class Game:
         self.enemy.update_animation()
         self.partner.update_animation()
     
+    def run_interlude(self):
+        interlude_lines = [
+            "enemy escaped...",
+            "But only for a while.",
+            "THEN THE BEAST IS COMEBACK!!!"
+        ]
+        try:
+            big_font = pygame.font.Font("resources/fonts/" + FONT_NAME + ".ttf", 50)
+        except FileNotFoundError:
+            big_font = pygame.font.SysFont(None, 50)
+        try:
+            btn_font = pygame.font.Font("resources/fonts/" + FONT_NAME + ".ttf", 35)
+        except FileNotFoundError:
+            btn_font = pygame.font.SysFont(None, 35)
+        continue_btn = pygame.Rect(WIDTH // 2 - 100, HEIGHT - 120, 200, 50)
+
+        for line in interlude_lines:
+            waiting = True
+            while waiting:
+                self.clock.tick(FPS)
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        pygame.quit()
+                        sys.exit()
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        if continue_btn.collidepoint(event.pos):
+                            waiting = False
+                self.draw(pygame.time.get_ticks() - self.total_paused_time)
+                overlay = pygame.Surface((WIDTH, HEIGHT))
+                overlay.set_alpha(100)
+                overlay.fill((0, 0, 0))
+                self.screen.blit(overlay, (0, 0))
+                lines = line.split("\n")
+                for i, l in enumerate(lines):
+                    surf = big_font.render(l, True, (255, 255, 255))
+                    rect = surf.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50 + i * 60))
+                    self.screen.blit(surf, rect)
+                mouse_pos = pygame.mouse.get_pos()
+                btn_color = (80, 80, 80) if not continue_btn.collidepoint(mouse_pos) else (130, 130, 130)
+                pygame.draw.rect(self.screen, btn_color, continue_btn)
+                pygame.draw.rect(self.screen, (255, 255, 255), continue_btn, 2)
+                cont_surf = btn_font.render("CONTINUE", True, (255, 255, 255))
+                self.screen.blit(cont_surf, cont_surf.get_rect(center=continue_btn.center))
+                pygame.display.flip()
+
     def transition_to_next_scene(self):
         """Resets combat states and positions entities for Phase 2 without activating Rage Mode yet."""
         now = pygame.time.get_ticks() - self.total_paused_time
@@ -550,6 +598,8 @@ class Game:
 
         self.player.x = WIDTH // 4 + PLAYER_CHAR_OFFSET_X
         self.player.facing_right = True
+
+        self.level = 2
 
         # Clean active projectiles
         self.bullets.player_bullets = []
@@ -662,18 +712,18 @@ class Game:
         pygame.draw.rect(s, (200, 200, 200), (20, 35, 200, 20), 2)
 
         if p.rage_mode:
-            s.blit(f.render("RAGE MODE", True, (255, 40, 40)), (20, 65))
+            s.blit(f.render("RAGE MODE", True, (255, 40, 40)), (20, 90))
         else:
             # AMMOLabel
-            s.blit(self.debug_info_font.render("AMMO:", True, (200, 200, 200)), (20, 65))
+            s.blit(self.debug_info_font.render("AMMO:", True, (200, 200, 200)), (20, 90))
             for i in range(12):
                 color = (255, 200, 50) if i < p.shots else (100, 100, 100)
                 # Shifted the bullets slightly right to make room for the label
-                pygame.draw.rect(s, color, (80 + (i * 15), 65, 10, 15))
+                pygame.draw.rect(s, color, (80 + (i * 15), 90, 10, 15))
 
             # Flashing RELOADINGAlert
             if p.shots == 0 and int(now / 250) % 2 == 0:
-                s.blit(self.debug_info_font.render("RELOADING...", True, (255, 50, 50)), (270, 65))
+                s.blit(self.debug_info_font.render("RELOADING...", True, (255, 50, 50)), (270, 90))
 
         # SURVIVAL BOSS BAR
         elapsed = now - self.start_time
@@ -705,10 +755,13 @@ class Game:
             s.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2))
 
         # ENEMY HP
-
         enemy_hp_text = f"BEAST HP: {int(self.enemy.hp)}"
         enemy_hp_surf = self.debug_info_font.render(enemy_hp_text, True, (255, 100, 100))
         s.blit(enemy_hp_surf, (WIDTH - enemy_hp_surf.get_width() - 20, 15))
+
+        # LEVEL indicator below enemy HP
+        level_label = f.render(f"LEVEL {self.level}", True, (200, 200, 200))
+        s.blit(level_label, (WIDTH // 2 - level_label.get_width() // 2, 50))
 
 
 
@@ -874,6 +927,13 @@ class Game:
 
             # Always draw the background game
             self.draw(frozen_now)
+
+            # Interlude between Scene 1 and Scene 2
+            if self.interlude_pending:
+                self.run_interlude()
+                self.interlude_pending = False
+                now = pygame.time.get_ticks() - self.total_paused_time
+                self.transition_to_next_scene()
 
             # ---  END SCREEN  ---
             if self.game_end:

@@ -8,7 +8,7 @@ FRAME_W = 128
 FRAME_H = 128
 
 # Debug
-DEBUG = True
+DEBUG = False
 
 # Debug colors
 DEFAULTBLUE = (0, 0, 255)
@@ -121,4 +121,4 @@ WOUNDED_Shoot_ENEMY_PATH = "resources/image/sprites/woundedEnemyShoot/"
 WOUNDED_Scar_ENEMY_PATH = "resources/image/sprites/woundedEnemyScar/"
 PARTNER_PATH = "resources/image/sprites/partner/"
 MUSIC_PATH = "resources/audio/musics/waking demon.mp3"
-MUSIC_VOLUME = 0.0
+MUSIC_VOLUME = 0.5
