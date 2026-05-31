@@ -11,7 +11,7 @@ from config import (
 
 
 class Enemy:
-    def __init__(self, normal_anims, wounded_anims):
+    def __init__(self, normal_anims, wounded_shoot_anims, wounded_scar_anims):
         self.x = WIDTH // 2 + ENEMY_CHAR_OFFSET_X
         self.y = HEIGHT // 2 + ENEMY_CHAR_OFFSET_Y
         self.facing_right = True
@@ -22,7 +22,8 @@ class Enemy:
         self.wounded = False
 
         self.normal_anims = normal_anims
-        self.wounded_anims = wounded_anims
+        self.wounded_shoot_anims = wounded_shoot_anims
+        self.wounded_scar_anims = wounded_scar_anims
         self.anims = dict(normal_anims)
 
         self.action = "idle"
@@ -58,8 +59,12 @@ class Enemy:
     def make_wounded(self):
         if self.wounded:
             return
+
         self.wounded = True
-        self.anims = dict(self.wounded_anims)
+
+        # default wounded sprite before rage
+        self.anims = dict(self.wounded_shoot_anims)
+
         self.animation = self.anims["hurt"]
         self.frame_index = 0.0
 
@@ -71,6 +76,17 @@ class Enemy:
         self.action = "idle"
         self.animation = self.anims["idle"]
         self.frame_index = 0.0
+
+    def update_wounded_sprite(self, rage_mode):
+        if not self.wounded:
+            return
+
+        if rage_mode:
+            self.anims = dict(self.wounded_scar_anims)
+        else:
+            self.anims = dict(self.wounded_shoot_anims)
+
+        self.animation = self.anims[self.action]
 
     def hurt_from_damage(self):
         self.hp -= 1
@@ -171,9 +187,9 @@ class Enemy:
             return
 
         if self.facing_right:
-            attack_rect = pygame.Rect(self.x + 20, self.y - 20, 20, 50)
+            attack_rect = pygame.Rect(self.x + 40, self.y - 20, 30, 50)
         else:
-            attack_rect = pygame.Rect(self.x - 70, self.y - 20, 30, 50)
+            attack_rect = pygame.Rect(self.x - 40, self.y - 20, 30, 50)
 
         if attack_rect.colliderect(player.rect):
             player.take_damage(ENEMY_ATTACK_DAMAGE, now)

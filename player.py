@@ -12,7 +12,11 @@ from config import (
 
 
 class Player:
-    def __init__(self, anims, rage_anims):
+    def __init__(self,
+        normal_anims,
+        wounded_anims,
+        rage_anims,
+        wounded_rage_anims):
         self.x = WIDTH // 4 + PLAYER_CHAR_OFFSET_X
         self.y = HEIGHT // 2 + PLAYER_CHAR_OFFSET_Y
         self.speed = PLAYER_SPEED
@@ -22,10 +26,16 @@ class Player:
         self.max_hp = PLAYER_MAX_HP
         self.dead = False
 
-        self.anims = anims
-        self.rage_anims = rage_anims
+        self.normal_anims = normal_anims
+        self.wounded_anims = wounded_anims
+
+        self.rage_normal_anims = rage_anims
+        self.rage_wounded_anims = wounded_rage_anims
+
+
+        self.anims = self.normal_anims
+        self.animation = self.anims["idle"]  # ✅ FIXED
         self.action = "idle"
-        self.animation = anims["idle"]
         self.frame_index = 0.0
 
         self.rage_mode = False
@@ -67,6 +77,26 @@ class Player:
     def can_attack(self):
         return self.action not in ["shoot", "attack", "jump", "hurt", "dead"]
 
+    def update_wounded_sprite(self):
+        wounded = self.hp < (self.max_hp)
+
+        if self.rage_mode:
+            new_set = self.rage_wounded_anims if wounded else self.rage_normal_anims
+        else:
+            new_set = self.wounded_anims if wounded else self.normal_anims
+
+        if self.anims != new_set:
+            self.anims = new_set
+
+            # keep current action valid
+            if self.action in self.anims:
+                self.animation = self.anims[self.action]
+                self.frame_index = min(self.frame_index, len(self.animation) - 1)
+            else:
+                self.action = "idle"
+                self.animation = self.anims["idle"]
+                self.frame_index = 0.0
+
     def set_animation(self, action, frames):
         if self.action != action:
             self.action = action
@@ -82,16 +112,14 @@ class Player:
 
     def activate_rage(self):
         self.rage_mode = True
-        self.anims["idle"] = self.rage_anims["idle"]
-        self.anims["walk"] = self.rage_anims["walk"]
-        self.anims["jump"] = self.rage_anims["jump"]
-        self.anims["attack"] = self.rage_anims["attack"]
-        self.anims["hurt"] = self.rage_anims["hurt"]
-        self.anims["dead"] = self.rage_anims["dead"]
-        self.anims["shoot"] = self.rage_anims["shoot"]
         self.scale = RAGE_SCALE
-        self.set_animation("attack", self.anims["attack"])
+
+        # force correct set immediately
+        self.anims = self.rage_wounded_anims if self.hp < self.max_hp  else self.rage_normal_anims
+
+        self.set_animation("idle", self.anims["idle"])
         self.snd_howl.play()
+
     @property
     def regen_amount(self):
         return PLAYER_RAGE_REGEN_AMOUNT if self.rage_mode else PLAYER_REGEN_AMOUNT
@@ -185,10 +213,12 @@ class Player:
     def handle_attack(self):
         if not self.can_attack():
             return
+
         self.recharging = False
         self.attack_has_hit = False
+
         if self.rage_mode:
-            chosen = random.choice(self.rage_anims["attack_list"])
+            chosen = random.choice(self.rage_normal_anims["attack_list"])
             self.set_animation("attack", chosen)
         else:
             self.set_animation("attack", self.anims["attack"])

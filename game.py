@@ -61,15 +61,25 @@ class Game:
         self.bg_moon = self.bg_moon_original.copy()
 
         # Load assets
-        player_anims = load_player_anims()
-        rage_anims = load_rage_anims()
-        enemy_normal, enemy_wounded = load_enemy_anims()
+        player_normal, player_wounded = load_player_anims()
+        rage_normal, rage_wounded = load_rage_anims()
+        enemy_normal, wounded_shoot, wounded_scar = load_enemy_anims()
         partner_anims = load_partner_anims()
         self.civic_img = load_civic_img()
 
         # Entities
-        self.player = Player(player_anims, rage_anims)
-        self.enemy = Enemy(enemy_normal, enemy_wounded)
+
+        self.player = Player(
+            player_normal,
+            player_wounded,
+            rage_normal,
+            rage_wounded
+        )
+        self.enemy = Enemy(
+            enemy_normal,
+            wounded_shoot,
+            wounded_scar
+        )
         self.partner = Partner(partner_anims)
         self.bullets = BulletManager()
         self.timeline = TimelineManager(self)
@@ -321,6 +331,8 @@ class Game:
                 self.enemy.hurt_from_damage()
 
         # Animations
+        self.enemy.update_wounded_sprite(self.player.rage_mode)
+        self.player.update_wounded_sprite()
         self.player.update_animation()
         self.enemy.update_animation()
         self.partner.update_animation()

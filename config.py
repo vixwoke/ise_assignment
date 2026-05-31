@@ -74,7 +74,7 @@ ENEMY_TARGET_TIME = 4000
 ESCAPE_SPEED = 5
 
 # Rage mode
-RAGE_TRIGGER_TIME = 8900
+RAGE_TRIGGER_TIME = 89000
 RAGE_SCALE = 1.2
 
 # Ending
@@ -112,8 +112,11 @@ FONT_SIZE = 35
 # Asset paths
 PLAYER_PATH = "resources/image/sprites/maincharacter/"
 RAGE_PATH = "resources/image/sprites/rageCharacter/"
+Wounded_Player_PATH="resources/image/sprites/maincharacterWounded/"
+Wounded_Rage_PATH="resources/image/sprites/rageCharacterWounded/"
 ENEMY_PATH = "resources/image/sprites/enemy/"
-WOUNDED_ENEMY_PATH = "resources/image/sprites/woundedEnemy/"
+WOUNDED_Shoot_ENEMY_PATH = "resources/image/sprites/woundedEnemyShoot/"
+WOUNDED_Scar_ENEMY_PATH = "resources/image/sprites/woundedEnemyScar/"
 PARTNER_PATH = "resources/image/sprites/partner/"
 MUSIC_PATH = "resources/audio/musics/waking demon.mp3"
 MUSIC_VOLUME = 0.0
