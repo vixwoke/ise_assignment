@@ -99,6 +99,16 @@ class Game:
         self.kill = False
         self.game_end = False
         self.game_result = ""
+        # Pause Functionality
+        self.paused = False
+        self.pause_start_time = 0
+        self.total_paused_time = 0
+        self.return_to_menu = False
+        self.resume_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 - 40, 300, 50)
+        self.menu_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 + 40, 300, 50)
+        # Pause UI Audio
+        self.snd_ui = pygame.mixer.Sound("resources/audio/ui_click.wav")
+        self.snd_ui.set_volume(0.6)
 
     @staticmethod
     def _load_bg(path, fallback_color=None, alpha=False):
@@ -199,14 +209,38 @@ class Game:
         if self.player.can_walk():
             if keys[pygame.K_a] or keys[pygame.K_d]:
                 moving = True
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                return False
+                pygame.quit()
+                sys.exit()
+
+            # Handle Esc Key for Pausing
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    if not self.paused:
+                        self.paused = True
+                        self.pause_start_time = pygame.time.get_ticks()
+                    else:
+                        self.paused = False
+                        self.total_paused_time += (pygame.time.get_ticks() - self.pause_start_time)
+
             if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
+                if self.paused:
+                    # If paused  check for button clicks
+                    mouse_pos = pygame.mouse.get_pos()
+                    if self.resume_btn.collidepoint(mouse_pos):
+                        self.paused = False
+                        self.total_paused_time += (pygame.time.get_ticks() - self.pause_start_time)
+                    elif self.menu_btn.collidepoint(mouse_pos):
+                        self.snd_ui.play()
+                        self.return_to_menu = True
+                else:
+                    # If playing normally  handle shooting
+                    if event.button == 1:
                         self.player.handle_shoot(self.bullets, moving)
-                if event.button == 3:
-                    self.player.handle_attack()
+                    if event.button == 3:
+                        self.player.handle_attack()
         return True
 
     def update(self, now):
@@ -292,6 +326,9 @@ class Game:
         else:
             self.draw_ui(now)
 
+            # Draw the pause menu
+        if self.paused:
+            self.draw_pause_menu()
         pygame.display.flip()
 
     def draw_ui(self, now):
@@ -408,20 +445,62 @@ class Game:
             ), (WIDTH - 450, info_y))
             info_y += 22
 
+    def draw_pause_menu(self):
+        # Draw dark overlay
+        overlay = pygame.Surface((WIDTH, HEIGHT))
+        overlay.set_alpha(150)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+
+        # Title
+        title_surf = self.font.render("PAUSED", True, (255, 255, 255))
+        title_rect = title_surf.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 120))
+        self.screen.blit(title_surf, title_rect)
+
+        mouse_pos = pygame.mouse.get_pos()
+
+        # Resume Button
+        res_color = (255, 255, 255) if self.resume_btn.collidepoint(mouse_pos) else (200, 200, 200)
+        res_surf = self.font.render("RESUME", True, res_color)
+        self.screen.blit(res_surf, res_surf.get_rect(center=self.resume_btn.center))
+
+        # Main Menu Button
+        menu_color = (255, 50, 50) if self.menu_btn.collidepoint(mouse_pos) else (200, 50, 50)
+        menu_surf = self.font.render("MAIN MENU", True, menu_color)
+        self.screen.blit(menu_surf, menu_surf.get_rect(center=self.menu_btn.center))
+
+
+
     def run(self):
         running = True
         while running:
             self.clock.tick(FPS)
-            now = pygame.time.get_ticks()
+            raw_now = pygame.time.get_ticks()
 
-            if not self.update_endings(now):
-                break
+            self.handle_events()
 
-            if not self.handle_events():
-                break
+            # Break the loop and return to main.py if player clicked MAIN MENU
+            if self.return_to_menu:
+                pygame.mixer.music.stop()
+                return
 
-            self.update(now)
-            self.draw(now)
+                # Calculate frozen time
+            frozen_now = raw_now - self.total_paused_time
+
+            # Only update characters and endings if the game is NOT paused
+            if not self.paused:
+                if not self.update_endings(frozen_now):
+                    break
+                self.update(frozen_now)
+
+            # Always draw the background game
+            self.draw(frozen_now)
+
+
+
+        # If the game naturally ends (death/escape) stop music and return to menu
+        pygame.mixer.music.stop()
+        return
 
         pygame.quit()
         sys.exit()

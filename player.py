@@ -48,6 +48,15 @@ class Player:
         self.fall_speed = 0
         self.on_ground = True
 
+        # Player Audio
+        self.snd_gun = pygame.mixer.Sound("resources/audio/gun.wav")
+        self.snd_gun.set_volume(0.4)
+        self.snd_reload = pygame.mixer.Sound("resources/audio/reload.wav")
+        self.snd_howl = pygame.mixer.Sound("resources/audio/howl.wav")
+        self.snd_howl.set_volume(0.8)
+        # Collision Audio
+        self.snd_melee = pygame.mixer.Sound("resources/audio/melee_hit.wav")
+
     # Action predicates
     def can_walk(self):
         return self.action not in ["shoot", "attack", "recharge", "hurt", "dead"]
@@ -82,7 +91,7 @@ class Player:
         self.anims["shoot"] = self.rage_anims["shoot"]
         self.scale = RAGE_SCALE
         self.set_animation("attack", self.anims["attack"])
-
+        self.snd_howl.play()
     @property
     def regen_amount(self):
         return PLAYER_RAGE_REGEN_AMOUNT if self.rage_mode else PLAYER_REGEN_AMOUNT
@@ -159,6 +168,7 @@ class Player:
                     self.set_animation("recharge", self.anims["recharge"])
                 else:
                     self.shots -= 1
+                    self.snd_gun.play()
                     self.set_animation("shoot", self.anims["shoot"])
                     bullet_manager.add_player_bullet(
                         self.x + 40, self.y + 35, self.facing_right
@@ -197,6 +207,7 @@ class Player:
         if self.recharging and now - self.recharge_start >= RECHARGE_TIME:
             self.recharging = False
             self.shots = MAX_SHOTS
+            self.snd_reload.play()
             if self.action == "recharge":
                 self.set_animation("idle", self.anims["idle"])
 
@@ -213,6 +224,7 @@ class Player:
             return False
         self.last_hit_time = now
         self.hp -= damage
+        self.snd_melee.play()
         if self.hp <= 0:
             self.hp = 0
             self.dead = True
