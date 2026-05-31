@@ -21,6 +21,13 @@ class Partner:
         # Partner Audio
         self.snd_shotgun = pygame.mixer.Sound("resources/audio/shotgun.wav")
         self.snd_shotgun.set_volume(0.4)
+        self._shotgun_vol = 0.4
+
+    def mute(self):
+        self.snd_shotgun.set_volume(0)
+
+    def unmute(self):
+        self.snd_shotgun.set_volume(self._shotgun_vol)
 
     def set_animation(self, action, frames):
         if self.action != action:

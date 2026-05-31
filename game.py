@@ -23,7 +23,7 @@ from player import Player
 from enemy import Enemy
 from partner import Partner
 from bullets import BulletManager
-
+from end_screen import EndScreen
 
 class Game:
     def __init__(self):
@@ -123,7 +123,8 @@ class Game:
         # Pause UI Audio
         self.snd_ui = pygame.mixer.Sound("resources/audio/ui_click.wav")
         self.snd_ui.set_volume(0.6)
-
+        # End Screen
+        self.end_screen = EndScreen(self.screen, self.font)
     @staticmethod
     def _load_bg(path, fallback_color=None, alpha=False):
         """Load a background image, falling back to a solid surface if missing."""
@@ -257,9 +258,13 @@ class Game:
                         if self.muted:
                             pygame.mixer.music.set_volume(0.0)
                             self.snd_ui.set_volume(0.0)
+                            self.player.mute()
+                            self.partner.mute()
                         else:
                             pygame.mixer.music.set_volume(0.5)
                             self.snd_ui.set_volume(0.6)
+                            self.player.unmute()
+                            self.partner.unmute()
                     elif debug_btn.collidepoint(mouse_pos):
                         self.debug_enabled = not self.debug_enabled
                         self.snd_ui.play()
@@ -569,6 +574,20 @@ class Game:
             # Always draw the background game
             self.draw(frozen_now)
 
+            # --- THE END SCREEN INTERCEPT ---
+            if self.game_end:
+                pygame.mixer.music.stop()  # Stop the intense Scene 2 music
+
+                # Figure out if they won or lost based on the string
+                result_type = "victory" if "EXECUTED" in self.game_result else "defeat"
+
+                # Run the screen and return their choice (play_again or main_menu)
+                choice = self.end_screen.run(result_type)
+                return choice
+
+            # If the timeline completely times out, fallback to menu
+        pygame.mixer.music.stop()
+        return "main_menu"
 
 
         # If the game naturally ends (death/escape) stop music and return to menu

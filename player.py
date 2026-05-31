@@ -53,10 +53,30 @@ class Player:
         self.snd_gun = pygame.mixer.Sound("resources/audio/gun.wav")
         self.snd_gun.set_volume(0.4)
         self.snd_reload = pygame.mixer.Sound("resources/audio/reload.wav")
+        self.snd_reload.set_volume(0.4)
         self.snd_howl = pygame.mixer.Sound("resources/audio/howl.wav")
         self.snd_howl.set_volume(0.8)
         # Collision Audio
         self.snd_melee = pygame.mixer.Sound("resources/audio/melee_hit.wav")
+        self.snd_melee.set_volume(0.4)
+        self._original_volumes = {
+            "gun": 0.4,
+            "reload": 0.4,
+            "howl": 0.8,
+            "melee": 0.4,
+        }
+
+    def mute(self):
+        self.snd_gun.set_volume(0)
+        self.snd_reload.set_volume(0)
+        self.snd_howl.set_volume(0)
+        self.snd_melee.set_volume(0)
+
+    def unmute(self):
+        self.snd_gun.set_volume(self._original_volumes["gun"])
+        self.snd_reload.set_volume(self._original_volumes["reload"])
+        self.snd_howl.set_volume(self._original_volumes["howl"])
+        self.snd_melee.set_volume(self._original_volumes["melee"])
 
     # Action predicates
     def can_walk(self):
