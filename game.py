@@ -403,9 +403,11 @@ class Game:
         self.enemy.update_auto_attack(now)
         self.civic_x, self.civic_y, self.target_partner, self.civic_hit = \
             self.enemy.update_march(
-                now, self.player.x, self.partner.x, self.partner.y, self.partner.dead,
+                now,
+                self.partner.x, self.partner.y, self.partner.dead,
                 self.civic_x, self.civic_y, self.target_partner, self.civic_hit,
                 self.player.scale,
+                self.player.x,
             )
 
         # Enemy escape end
