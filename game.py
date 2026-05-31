@@ -248,9 +248,13 @@ class Game:
                         if self.muted:
                             pygame.mixer.music.set_volume(0.0)
                             self.snd_ui.set_volume(0.0)
+                            self.player.mute()
+                            self.partner.mute()
                         else:
                             pygame.mixer.music.set_volume(0.5)
                             self.snd_ui.set_volume(0.6)
+                            self.player.unmute()
+                            self.partner.unmute()
                     elif debug_btn.collidepoint(mouse_pos):
                         self.debug_enabled = not self.debug_enabled
                         self.snd_ui.play()
