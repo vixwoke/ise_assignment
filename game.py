@@ -1,9 +1,8 @@
 from timeline import TimelineManager
 import pygame
-import random
 import sys
 from config import (
-    WIDTH, HEIGHT, FPS, FRAME_W, FRAME_H, RAGE_TRIGGER_TIME,
+    WIDTH, HEIGHT, FPS, FRAME_W, FRAME_H,
     ENDING_TIME, ESCAPE_TIME, ENDGAME_TIME, ENEMY_TARGET_TIME, MUSIC_PATH,
     MUSIC_VOLUME, FONT_NAME, FONT_SIZE, DEBUG, PARTNER_DEATH_PAUSE,
     BG_SKY_PATH, BG_MOON_PATH, BG_CLOUDS_PATH, BG_ROCKS_PATH, BG_GROUND_PATH,
@@ -101,17 +100,17 @@ class Game:
         self.partner.last_shot = self.start_time
 
         # Debug moon toggle with smooth transition
-        self.moon_current_t = 0.2  # blush pink at game start
-        self._apply_moon_color(self.moon_current_t)
+        self.moon_is_red = False
+        self.moon_current_t = 0.0
+        self.moon_transition_start = 0
+        self.moon_transition_duration = 0
+        self.moon_start_t = 0.0
+        self.moon_target_t = 0.0
+        self.moon_btn_rect = pygame.Rect(WIDTH - 150, 55, 160, 30)
 
         # Partner death tracking
         self.partner_death_handled = False
         self.partner_death_time = 0
-
-        # Moon flickering
-        self.moon_flicker_active = False
-        self.moon_flicker_timer = 0
-        self.moon_flicker_red = False
 
         # Ending
         self.ending_triggered = False
@@ -149,19 +148,40 @@ class Game:
 
     def _apply_moon_color(self, t):
         self.bg_moon = self.bg_moon_original.copy()
+        gb = int(255 * (1 - t))
+        self.bg_moon.fill((255, gb, gb), None, pygame.BLEND_RGB_MULT)
 
-        green = int(220 - (200 * t))
-        blue = int(220 - (220 * t))
+    def moon_red(self, enable, duration=0):
+        if enable:
+            if duration <= 0:
+                self.moon_current_t = 1.0
+                self._apply_moon_color(1.0)
+                self.moon_transition_duration = 0
+            else:
+                self.moon_transition_start = pygame.time.get_ticks()
+                self.moon_transition_duration = duration
+                self.moon_start_t = self.moon_current_t
+                self.moon_target_t = 1.0
+        else:
+            if duration <= 0:
+                self.moon_current_t = 0.0
+                self._apply_moon_color(0.0)
+                self.moon_transition_duration = 0
+            else:
+                self.moon_transition_start = pygame.time.get_ticks()
+                self.moon_transition_duration = duration
+                self.moon_start_t = self.moon_current_t
+                self.moon_target_t = 0.0
 
-        green = max(20, green)
-        blue = max(0, blue)
-
-        self.bg_moon.fill(
-            (255, green, blue),
-            None,
-            pygame.BLEND_RGB_MULT
-        )
-
+    def _update_moon_transition(self, now):
+        if self.moon_transition_duration <= 0:
+            return
+        elapsed = now - self.moon_transition_start
+        progress = min(elapsed / self.moon_transition_duration, 1.0)
+        self.moon_current_t = self.moon_start_t + (self.moon_target_t - self.moon_start_t) * progress
+        self._apply_moon_color(self.moon_current_t)
+        if progress >= 1.0:
+            self.moon_transition_duration = 0
 
     # Ground detection
     def is_on_ground(self, px, py):
@@ -284,28 +304,17 @@ class Game:
                         self.pause_start_time = pygame.time.get_ticks()
                     else:
                         if event.button == 1:
-                            self.player.handle_shoot(self.bullets, moving)
+                            if self.debug_enabled and self.moon_btn_rect.collidepoint(event.pos):
+                                self.moon_is_red = not self.moon_is_red
+                                self.moon_red(self.moon_is_red, 1000)
+                            else:
+                                self.player.handle_shoot(self.bullets, moving)
                         if event.button == 3:
                             self.player.handle_attack()
         return True
 
     def update(self, now):
-        elapsed = now - self.start_time
-
-        # Moon slowly becomes blood red
-        progress = min(elapsed / RAGE_TRIGGER_TIME, 1.0)
-
-        # Start at blush (0.2) and reach blood red (1.0)
-        self.moon_current_t = 0.2 + (0.8 * progress)
-
-        # Override with flickering when active
-        if self.moon_flicker_active and not self.player.rage_mode:
-            if now >= self.moon_flicker_timer:
-                self.moon_flicker_red = not self.moon_flicker_red
-                self.moon_flicker_timer = now + random.randint(5000, 20000)
-            self.moon_current_t = 0.8 if self.moon_flicker_red else 0.2
-
-        self._apply_moon_color(self.moon_current_t)
+        self._update_moon_transition(now)
         keys = pygame.key.get_pressed()
         self.player.handle_movement(keys)
         self.player.handle_jump(keys)
@@ -331,7 +340,7 @@ class Game:
             self.enemy.update_march(
                 now, self.partner.x, self.partner.y, self.partner.dead,
                 self.civic_x, self.civic_y, self.target_partner, self.civic_hit,
-                self.player.scale, self.player.x,
+                self.player.scale,
             )
 
         # Enemy escape end
@@ -352,7 +361,7 @@ class Game:
             if not self.enemy.dead:
                 self.enemy.hurt_from_damage()
 
-        # Partner death → 2s pause → back to player chase + moon flicker
+        # Partner death → 2s pause → back to player chase
         if self.partner.dead and not self.partner_death_handled:
             self.partner_death_handled = True
             self.partner_death_time = now
@@ -362,8 +371,7 @@ class Game:
                 and self.target_partner:
             self.target_partner = False
             self.enemy.phase = 0
-            self.moon_flicker_active = True
-            self.moon_flicker_timer = now + random.randint(5000, 20000)
+
 
         # Animations
         self.enemy.update_wounded_sprite(self.player.rage_mode)
@@ -404,24 +412,19 @@ class Game:
         # Draw the pause menu
         if self.paused:
             self.draw_pause_menu()
+
+        if self.debug_enabled:
+            btn_color = (255, 100, 100) if self.moon_is_red else (200, 200, 200)
+            pygame.draw.rect(self.screen, btn_color, self.moon_btn_rect)
+            pygame.draw.rect(self.screen, (255, 255, 255), self.moon_btn_rect, 2)
+            self.screen.blit(self.debug_font.render("Test moon switch 1s", True, (0, 0, 0)),
+                   (self.moon_btn_rect.x + 6, self.moon_btn_rect.y + 8))
         pygame.display.flip()
 
     def draw_ui(self, now):
         p = self.player
-        e = self.enemy
         s = self.screen
         f = self.font
-
-        s.blit(f.render(f"Shots: {p.shots}/{12}", True, (255, 255, 255)), (20, 20))
-        s.blit(f.render(f"Action: {p.action}", True, (255, 255, 0)), (20, 60))
-        s.blit(f.render(f"Enemy: {e.action}", True, (255, 100, 100)), (20, 100))
-        s.blit(f.render(f"Player HP: {int(p.hp)}", True, (100, 255, 100)), (20, 140))
-        s.blit(f.render(f"Enemy HP: {e.hp:.1f}", True, (255, 100, 100)), (20, 180))
-
-        if now - self.start_time >= ENDING_TIME:
-            s.blit(f.render(f"Can Kill: {bool(self.can_kill)}", True, (255, 100, 100)), (20, 240))
-
-        s.blit(f.render(f"Time: {int(now)}", True, (255, 100, 100)), (20, 280))
 
         if p.rage_mode:
             s.blit(f.render("RAGE MODE", True, (255, 40, 40)), (20, 220))

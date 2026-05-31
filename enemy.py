@@ -38,8 +38,10 @@ class Enemy:
         self.locked = False
         self.escape = False
 
+        self.waiting_after_civic = False
+
         # OPTIONAL: cleaner phase control
-        self.phase = 0  # 0 = player, 1 = partner
+        self.phase = 0  # 0 = civic, 1 = partner
 
         self.fall_speed = 0
         self.on_ground = False
@@ -117,10 +119,16 @@ class Enemy:
     # MAIN AI
     # -------------------------
     def update_march(self, now, partner_x, partner_y, partner_dead,
-                     civic_x, civic_y, target_partner, civic_hit, scale, player_x):
+                     civic_x, civic_y, target_partner, civic_hit, scale):
 
         if not self.march or self.dead or self.locked:
             return civic_x, civic_y, target_partner, civic_hit
+
+        # switch phase after civic hit
+        if self.waiting_after_civic:
+            self.phase = 1
+            target_partner = True
+            self.waiting_after_civic = False
 
         # escape
         if self.escape:
@@ -129,10 +137,12 @@ class Enemy:
             self.facing_right = False
             return civic_x, civic_y, target_partner, civic_hit
 
-        # partner dead — idle during phase 1 (pause), chase player in phase 0
-        if partner_dead and self.phase == 1:
-            if self.action != "idle":
-                self.set_animation("idle", self.anims["idle"])
+        # partner dead — continue attacking on a timer
+        if partner_dead:
+            if now - self.attack_timer >= ENEMY_ATTACK_INTERVAL:
+                self.attack_timer = now
+                self.set_animation("attack", self.anims["attack"])
+                self.has_hit_partner = False
             return civic_x, civic_y, target_partner, civic_hit
 
         # -------------------------
@@ -141,7 +151,7 @@ class Enemy:
         if self.phase == 1:
             tx = partner_x
         else:
-            tx = player_x
+            tx = civic_x
 
         dx = tx - self.x
         distance = abs(dx)
@@ -156,6 +166,13 @@ class Enemy:
         else:
                 if self.action != "attack":
                     self.set_animation("attack", self.anims["attack"])
+
+                current_frame = int(self.frame_index)
+                if current_frame == 4 and not civic_hit:
+                    civic_x += 100
+                    civic_y += 100
+                    civic_hit = True
+                    self.waiting_after_civic = True
 
         return civic_x, civic_y, target_partner, civic_hit
 
