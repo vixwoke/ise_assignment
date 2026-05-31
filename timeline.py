@@ -31,6 +31,7 @@ class TimelineManager:
         def trigger_enemy_march(game):
             if not game.enemy.march:
                 game.enemy.march = True
+                game.enemy.phase = 0
 
         # Event 2: Enemy targets partner
         def trigger_enemy_phase_1(game):
