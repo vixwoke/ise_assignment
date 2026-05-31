@@ -1,4 +1,6 @@
 import math
+from cmath import phase
+
 import pygame
 from config import (
     WIDTH, HEIGHT, FRAME_W, FRAME_H, ENEMY_HP, ENEMY_MAX_HP, ENEMY_SPEED,
@@ -8,6 +10,7 @@ from config import (
     ENEMY_CHAR_OFFSET_X, ENEMY_CHAR_OFFSET_Y,
     ENEMY_CHAR_HITBOX_W, ENEMY_CHAR_HITBOX_H,
 )
+
 
 class Enemy:
     def __init__(self, normal_anims, wounded_shoot_anims, wounded_scar_anims):
@@ -40,6 +43,7 @@ class Enemy:
 
         self.phase = 0
 
+
         self.fall_speed = 0
         self.on_ground = False
         self.waiting_after_civic = False
@@ -49,12 +53,10 @@ class Enemy:
         return pygame.Rect(self.x, self.y, ENEMY_CHAR_HITBOX_W, ENEMY_CHAR_HITBOX_H)
 
     def set_animation(self, action, frames):
-        # Restored guard condition to prevent animations from freezing on frame 0
-        if self.action != action:
-            self.action = action
-            self.animation = frames
-            self.frame_index = 0.0
-            self.has_hit_partner = False
+        self.action = action
+        self.animation = frames
+        self.frame_index = 0.0
+        self.has_hit_partner = False
 
     def make_wounded(self):
         if self.wounded:
@@ -109,14 +111,18 @@ class Enemy:
             self.on_ground = False
 
     def update_march(self, now, partner_x, partner_y, partner_dead,
-                     civic_x, civic_y, target_partner, civic_hit, scale, player_x, is_scene_1=False):
+                     civic_x, civic_y, target_partner, civic_hit, scale, player_x):
 
+
+        # 🔧 FIX 1: sync old flag with new system
         self.march = (self.mode == "march")
 
+        # 🔧 FIX 2: REMOVE broken dependency
         if self.dead or self.locked:
             return civic_x, civic_y, target_partner, civic_hit
 
-        if self.waiting_after_civic and not is_scene_1:
+
+        if self.waiting_after_civic:
             self.phase = 2
             target_partner = True
             self.waiting_after_civic = False
@@ -127,22 +133,19 @@ class Enemy:
             self.facing_right = False
             return civic_x, civic_y, target_partner, civic_hit
 
-        if partner_dead and self.phase == 2 and not is_scene_1:
+        if partner_dead and self.phase == 2:
             self.phase = 0
             target_partner = False
 
             if self.action != "idle":
                 self.set_animation("idle", self.anims["idle"])
 
-        # TARGETING PATHWAYS
-        if is_scene_1:
+        # TARGETING
+        if self.mode == "chase":
             tx = player_x
             target_partner = False
-            self.phase = 0
-        elif self.mode == "chase":
-            tx = player_x
-            target_partner = False
-            self.phase = 0
+            self.phase = 0   # 🔧 FIX 5
+
         elif self.mode == "march":
             target_partner = True
 
@@ -153,6 +156,7 @@ class Enemy:
             else:
                 tx = player_x
 
+
         dx = tx - self.x
         distance = abs(dx)
 
@@ -161,13 +165,16 @@ class Enemy:
             self.action = "walk"
             self.animation = self.anims["walk"]
             self.facing_right = dx > 0
+
         else:
             if self.action != "attack":
                 self.set_animation("attack", self.anims["attack"])
 
             current_frame = int(self.frame_index)
 
-            if current_frame == 4 and not civic_hit and distance <= 80 and self.mode == "march" and not is_scene_1:
+            # 🔧 FIX 3: prevent air hit
+
+            if current_frame == 4 and not civic_hit and distance <= 80 and self.mode == "march":
                 civic_x += 100
                 civic_y += 100
                 civic_hit = True
@@ -182,6 +189,9 @@ class Enemy:
 
         return civic_x, civic_y, target_partner, civic_hit
 
+    # -------------------------
+    # DAMAGE PLAYER
+    # -------------------------
     def damage_player(self, player, now):
         if self.action != "attack" or player.action == "hurt":
             return
@@ -197,6 +207,9 @@ class Enemy:
         if attack_rect.colliderect(player.rect):
             player.take_damage(ENEMY_ATTACK_DAMAGE, now)
 
+    # -------------------------
+    # DAMAGE PARTNER
+    # -------------------------
     def damage_partner(self, partner, now):
         if not partner or partner.dead:
             return
@@ -218,6 +231,9 @@ class Enemy:
                     partner.dead = True
                     partner.set_animation("dead", partner.anims["dead"])
 
+    # -------------------------
+    # OTHER SYSTEMS (UNCHANGED)
+    # -------------------------
     def update_auto_attack(self, now):
         if self.dead or self.march or self.locked:
             return

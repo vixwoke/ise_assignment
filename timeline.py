@@ -27,27 +27,21 @@ class TimelineManager:
         self._setup_events()
 
     def _setup_events(self):
-        # T=2s: Start targeting Civic first
         def trigger_enemy_march(game):
+            game.enemy.mode = "chase"
+            game.enemy.phase = 0
+
+        def trigger_enemy_phase_1(game):
             game.enemy.mode = "march"
             game.enemy.phase = 1
             game.target_partner = True
 
-        # T=74s: Pivot to targeting Partner second
-        def trigger_enemy_phase_1(game):
-            game.enemy.mode = "march"
-            game.enemy.phase = 2
-            game.target_partner = True
-
-        # T=84s: Switch to active chase hunting the player during Rage Mode
         def trigger_rage_mode(game):
             if not game.player.rage_mode:
                 game.player.activate_rage()
                 game.enemy.hp = game.enemy.max_hp
                 game.enemy.make_normal()
                 game.player.hp = game.player.max_hp
-                game.enemy.mode = "chase"
-                game.enemy.phase = 0
 
         def trigger_ending(game):
             if not game.ending_triggered:

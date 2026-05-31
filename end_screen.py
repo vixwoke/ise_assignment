@@ -72,7 +72,10 @@ class EndScreen:
             elif result == "defeat":
                 self.draw_text_center("ENEMY ESCAPED", self.font, (255, 50, 50), HEIGHT // 2 - 120)
                 self.draw_text_center("John was too late.", self.font, (200, 200, 200), HEIGHT // 2 - 40)
-
+                # --- GAME OVER TEXT ---
+            elif result == "game_over":
+                self.draw_text_center("YOU DIED", self.font, (255, 50, 50), HEIGHT // 2 - 120)
+                self.draw_text_center("The beast consumed you.", self.font, (200, 200, 200), HEIGHT // 2 - 40)
             # 3. Draw the Buttons
             self.draw_button(self.btn_play_again, "PLAY AGAIN", mouse_pos)
             self.draw_button(self.btn_main_menu, "MAIN MENU", mouse_pos)
