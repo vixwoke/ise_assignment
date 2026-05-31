@@ -7,26 +7,18 @@ class NarrativeEngine:
         self.screen = screen
         self.font = font
 
-        # The Scene 1 Script
-        # The Scene 1 Script (Safe and isolated!)
         self.script = {
-            "intro": [
-                "John: The radio signal died somewhere around here.",
-                "John: It's too quiet. Even the crickets are dead.",
-                "John: The air feels heavy... metallic. Like copper.",
-                "John: I shouldn't have let her come out to these woods alone.",
-                "John: I need to find the Civic. Hopefully, she's still waiting inside.",
-                "John: Keep it together, John. Just find the car and get out."
-            ],
-            "find_car": [
-                "John: The Civic... the doors are completely shredded.",
-                "John: These claw marks ripped right through the steel. A bear couldn't do this.",
-                "John: There's a blood trail leading deeper into the woods. I have to hurry."
-            ],
-            "blackout": [
-                "John: The moon... why is it glowing pink?",
-                "John: Ugh, my head... my blood feels like it's boiling!",
-                "John: Something is under my skin... ARGHHH!"
+            "prologue": [
+                "Partner: John! John, wake up! We're almost at the location.",
+                "John: Ugh... my head... what happened? I blacked out again?",
+                "John: The moon... it's bright red. Like a bloodshot eye staring down at us.",
+                "Partner: Red? John, the moon looks completely normal to me.",
+                "John: You don't see it? The whole sky has this crimson glow...",
+                "Partner: I see a clear night sky. You must have hit your head hard.",
+                "John: Maybe... but I know what I saw. Let's just get this done.",
+                "[They arrive at the scene]",
+                "John: God... no. There are bodies everywhere. This thing is a monster.",
+                "Partner: Stay sharp, John. Whatever did this might still be here."
             ]
         }
 

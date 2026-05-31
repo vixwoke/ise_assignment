@@ -13,7 +13,7 @@ class IntroCutscene:
         self.narrative = NarrativeEngine(self.screen, self.font)
 
         # Automatically trigger the first story beat
-        self.narrative.trigger_beat("intro")
+        self.narrative.trigger_beat("prologue")
 
     def run(self):
         clock = pygame.time.Clock()

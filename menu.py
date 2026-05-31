@@ -107,11 +107,12 @@ class MainMenu:
             # ---------------------------------------------------------
             elif self.state == "STORY":
                 story_text = [
-                    "During a routine investigation of a strange pink moon phenomenon,",
-                    "John blacks out. He awakens in a nightmare where his own body",
-                    "betrays him. With his partner fighting by his side, John must",
-                    "survive the horde while fighting the beast within himself.",
-                    "Will you resist the rage, or let it consume you?"
+                    "John and his partner, police officers investigating reports",
+                    "of a beast-like creature, journey into the woods. When John",
+                    "awakens from a blackout to a pink-tinted world only he can see,",
+                    "they stumble upon a massacre. The beast regenerates. John heals",
+                    "slowly too. As the moon fades to normal, so does the healing.",
+                    "The beast escapes. But it will return..."
                 ]
                 y_offset = 300
                 for line in story_text:

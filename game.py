@@ -314,6 +314,7 @@ class Game:
         if not attack_rect.colliderect(e.rect) or p.attack_has_hit:
             return
         p.attack_has_hit = True
+        p.snd_melee.play()
         if e.dead or e.action == "hurt":
             return
         if not self.check_execution():
@@ -328,6 +329,7 @@ class Game:
         if not leap_rect.colliderect(e.rect) or p.attack_has_hit:
             return
         p.attack_has_hit = True
+        p.snd_melee.play()
         if e.dead or e.action == "hurt":
             return
         if not self.check_execution():
@@ -521,9 +523,9 @@ class Game:
     
     def run_interlude(self):
         interlude_lines = [
-            "enemy escaped...",
-            "But only for a while.",
-            "THEN THE BEAST IS COMEBACK!!!"
+            "The beast escaped into the darkness...",
+            "But John knows it will return.",
+            "ONE MONTH LATER..."
         ]
         try:
             big_font = pygame.font.Font("resources/fonts/" + FONT_NAME + ".ttf", 50)
