@@ -118,7 +118,7 @@ class Enemy:
     # -------------------------
     # MAIN AI
     # -------------------------
-    def update_march(self, now, partner_x, partner_y, partner_dead,
+    def update_march(self, now, player_x, partner_x, partner_y, partner_dead,
                      civic_x, civic_y, target_partner, civic_hit, scale):
 
         if not self.march or self.dead or self.locked:
@@ -138,7 +138,7 @@ class Enemy:
             return civic_x, civic_y, target_partner, civic_hit
 
         # partner dead — continue attacking on a timer
-        if partner_dead:
+        if partner_dead and target_partner:
             if now - self.attack_timer >= ENEMY_ATTACK_INTERVAL:
                 self.attack_timer = now
                 self.set_animation("attack", self.anims["attack"])
@@ -148,7 +148,9 @@ class Enemy:
         # -------------------------
         # TARGETING (FIXED: X ONLY)
         # -------------------------
-        if self.phase == 1:
+        if partner_dead:
+            tx = player_x
+        elif self.phase == 1:
             tx = partner_x
         else:
             tx = civic_x
