@@ -1,10 +1,11 @@
 from timeline import TimelineManager
 import pygame
+import random
 import sys
 from config import (
     WIDTH, HEIGHT, FPS, FRAME_W, FRAME_H, RAGE_TRIGGER_TIME,
     ENDING_TIME, ESCAPE_TIME, ENDGAME_TIME, ENEMY_TARGET_TIME, MUSIC_PATH,
-    MUSIC_VOLUME, FONT_NAME, FONT_SIZE, DEBUG,
+    MUSIC_VOLUME, FONT_NAME, FONT_SIZE, DEBUG, PARTNER_DEATH_PAUSE,
     BG_SKY_PATH, BG_MOON_PATH, BG_CLOUDS_PATH, BG_ROCKS_PATH, BG_GROUND_PATH,
     MOON_X, MOON_Y, MOON_SCALE_W,
     PLAYER_CHAR_OFFSET_X, PLAYER_CHAR_OFFSET_Y,
@@ -22,7 +23,7 @@ from player import Player
 from enemy import Enemy
 from partner import Partner
 from bullets import BulletManager
-
+from end_screen import EndScreen
 
 class Game:
     def __init__(self):
@@ -103,6 +104,15 @@ class Game:
         self.moon_current_t = 0.2  # blush pink at game start
         self._apply_moon_color(self.moon_current_t)
 
+        # Partner death tracking
+        self.partner_death_handled = False
+        self.partner_death_time = 0
+
+        # Moon flickering
+        self.moon_flicker_active = False
+        self.moon_flicker_timer = 0
+        self.moon_flicker_red = False
+
         # Ending
         self.ending_triggered = False
         self.can_kill = False
@@ -123,7 +133,8 @@ class Game:
         # Pause UI Audio
         self.snd_ui = pygame.mixer.Sound("resources/audio/ui_click.wav")
         self.snd_ui.set_volume(0.6)
-
+        # End Screen
+        self.end_screen = EndScreen(self.screen, self.font)
     @staticmethod
     def _load_bg(path, fallback_color=None, alpha=False):
         """Load a background image, falling back to a solid surface if missing."""
@@ -257,9 +268,13 @@ class Game:
                         if self.muted:
                             pygame.mixer.music.set_volume(0.0)
                             self.snd_ui.set_volume(0.0)
+                            self.player.mute()
+                            self.partner.mute()
                         else:
                             pygame.mixer.music.set_volume(0.5)
                             self.snd_ui.set_volume(0.6)
+                            self.player.unmute()
+                            self.partner.unmute()
                     elif debug_btn.collidepoint(mouse_pos):
                         self.debug_enabled = not self.debug_enabled
                         self.snd_ui.play()
@@ -282,6 +297,13 @@ class Game:
 
         # Start at blush (0.2) and reach blood red (1.0)
         self.moon_current_t = 0.2 + (0.8 * progress)
+
+        # Override with flickering when active
+        if self.moon_flicker_active and not self.player.rage_mode:
+            if now >= self.moon_flicker_timer:
+                self.moon_flicker_red = not self.moon_flicker_red
+                self.moon_flicker_timer = now + random.randint(5000, 20000)
+            self.moon_current_t = 0.8 if self.moon_flicker_red else 0.2
 
         self._apply_moon_color(self.moon_current_t)
         keys = pygame.key.get_pressed()
@@ -309,7 +331,7 @@ class Game:
             self.enemy.update_march(
                 now, self.partner.x, self.partner.y, self.partner.dead,
                 self.civic_x, self.civic_y, self.target_partner, self.civic_hit,
-                self.player.scale,
+                self.player.scale, self.player.x,
             )
 
         # Enemy escape end
@@ -329,6 +351,19 @@ class Game:
         if self.bullets.update_partner_bullets(self.enemy.rect):
             if not self.enemy.dead:
                 self.enemy.hurt_from_damage()
+
+        # Partner death → 2s pause → back to player chase + moon flicker
+        if self.partner.dead and not self.partner_death_handled:
+            self.partner_death_handled = True
+            self.partner_death_time = now
+
+        if self.partner.dead and self.partner_death_handled \
+                and now - self.partner_death_time >= PARTNER_DEATH_PAUSE \
+                and self.target_partner:
+            self.target_partner = False
+            self.enemy.phase = 0
+            self.moon_flicker_active = True
+            self.moon_flicker_timer = now + random.randint(5000, 20000)
 
         # Animations
         self.enemy.update_wounded_sprite(self.player.rage_mode)
@@ -551,6 +586,20 @@ class Game:
             # Always draw the background game
             self.draw(frozen_now)
 
+            # --- THE END SCREEN INTERCEPT ---
+            if self.game_end:
+                pygame.mixer.music.stop()  # Stop the intense Scene 2 music
+
+                # Figure out if they won or lost based on the string
+                result_type = "victory" if "EXECUTED" in self.game_result else "defeat"
+
+                # Run the screen and return their choice (play_again or main_menu)
+                choice = self.end_screen.run(result_type)
+                return choice
+
+            # If the timeline completely times out, fallback to menu
+        pygame.mixer.music.stop()
+        return "main_menu"
 
 
         # If the game naturally ends (death/escape) stop music and return to menu

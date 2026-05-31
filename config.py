@@ -35,10 +35,11 @@ ENEMY_CHAR_HITBOX_H = 60
 
 # Gravity
 GRAVITY = 2
-JUMP_FORCE = -20
+JUMP_FORCE = -28
 
 # Player
 PLAYER_SPEED = 5
+AIR_SPEED = 8
 PLAYER_HP = 100.0
 PLAYER_MAX_HP = 100.0
 PLAYER_HIT_COOLDOWN = 1000
@@ -70,7 +71,9 @@ ENEMY_REGEN_INTERVAL = 5000
 ENEMY_REGEN_AMOUNT = 1
 
 # Enemy march
-ENEMY_TARGET_TIME = 4000
+ENEMY_TARGET_TIME = 2000
+ENEMY_PHASE_1_TIME = 20000
+PARTNER_DEATH_PAUSE = 2000
 ESCAPE_SPEED = 5
 
 # Rage mode
@@ -100,10 +103,10 @@ BG_CLOUDS_PATH = "resources/image/background/night-grass-clouds.png"
 BG_ROCKS_PATH = "resources/image/background/night-grass-rocks.png"
 BG_GROUND_PATH = "resources/image/background/night-grass-ground.png"
 BG_MENU_PATH = "resources/image/background/menu_bg.png"
-# Moon position
-MOON_X = 700
-MOON_Y = 100
-MOON_SCALE_W = 200
+# Moon position and size
+MOON_X = 600
+MOON_Y = 0
+MOON_SCALE_W = 400
 
 # Font
 FONT_NAME = "vcrosdmono"

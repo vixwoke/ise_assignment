@@ -1,7 +1,7 @@
 import pygame
 import sys
 from config import WIDTH, HEIGHT, BG_MENU_PATH, FONT_NAME
-
+from dialogue import NarrativeEngine
 
 class MainMenu:
     def __init__(self, screen):
@@ -42,6 +42,7 @@ class MainMenu:
             pygame.mixer.music.play(-1)
         except FileNotFoundError:
             pass
+
 
     def draw_text_center(self, text, font, color, y_pos):
         text_surface = font.render(text, True, color)
@@ -137,6 +138,8 @@ class MainMenu:
 
                 if self.draw_button(self.back_btn, "BACK", mouse_pos, mouse_clicked):
                     self.state = "MAIN"
+
+                
 
 
 
