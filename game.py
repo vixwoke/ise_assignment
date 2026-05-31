@@ -1,5 +1,6 @@
 from timeline import TimelineManager
 import pygame
+import random
 import sys
 from config import (
     WIDTH, HEIGHT, FPS, FRAME_W, FRAME_H,
@@ -60,6 +61,10 @@ class Game:
         self.bg_moon_original = pygame.transform.scale(moon_raw, (self.moon_w, self.moon_h))
         self.bg_moon = self.bg_moon_original.copy()
 
+        # Originals for lightning flash effect
+        self.bg_sky_original = self.bg_sky.copy()
+        self.bg_clouds_original = self.bg_clouds.copy()
+
         # Load assets
         player_normal, player_wounded = load_player_anims()
         rage_normal, rage_wounded = load_rage_anims()
@@ -107,6 +112,14 @@ class Game:
         self.moon_start_t = 0.0
         self.moon_target_t = 0.0
         self.moon_btn_rect = pygame.Rect(WIDTH - 150, 55, 160, 30)
+
+        # Lightning animation (sky & clouds flash)
+        self.lightning_state = "idle"
+        self.lightning_state_timer = self.start_time + random.randint(3000, 8000)
+        self.lightning_sky_intensity = 0.0
+        self.lightning_clouds_intensity = 0.0
+        self.lightning_remaining_flashes = 0
+        self.lightning_cloud_delay = 0
 
         # Partner death tracking
         self.partner_death_handled = False
@@ -182,6 +195,58 @@ class Game:
         self._apply_moon_color(self.moon_current_t)
         if progress >= 1.0:
             self.moon_transition_duration = 0
+
+    def _update_lightning(self, now):
+        if self.lightning_state == "idle":
+            if now >= self.lightning_state_timer:
+                self.lightning_remaining_flashes = random.randint(1, 3)
+                self.lightning_state = "sky_flash"
+                self.lightning_state_timer = now + 120
+                self.lightning_sky_intensity = 1.0
+        elif self.lightning_state == "sky_flash":
+            remaining = self.lightning_state_timer - now
+            if remaining <= 0:
+                self.lightning_sky_intensity = 0.0
+                self.lightning_cloud_delay = random.randint(0, 1000)
+                self.lightning_state = "cloud_wait"
+                self.lightning_state_timer = now + self.lightning_cloud_delay
+            else:
+                self.lightning_sky_intensity = min(remaining / 120.0, 1.0)
+        elif self.lightning_state == "cloud_wait":
+            if now >= self.lightning_state_timer:
+                self.lightning_clouds_intensity = 1.0
+                self.lightning_state = "cloud_flash"
+                self.lightning_state_timer = now + 120
+        elif self.lightning_state == "cloud_flash":
+            remaining = self.lightning_state_timer - now
+            if remaining <= 0:
+                self.lightning_clouds_intensity = 0.0
+                self.lightning_remaining_flashes -= 1
+                if self.lightning_remaining_flashes > 0:
+                    self.lightning_state = "sky_flash"
+                    self.lightning_sky_intensity = 1.0
+                    self.lightning_state_timer = now + 120
+                else:
+                    self.lightning_state = "idle"
+                    self.lightning_state_timer = now + random.randint(3000, 8000)
+            else:
+                self.lightning_clouds_intensity = min(remaining / 120.0, 1.0)
+
+        # Apply flash to sky surface
+        if self.lightning_sky_intensity > 0:
+            self.bg_sky = self.bg_sky_original.copy()
+            c = int(255 * self.lightning_sky_intensity)
+            self.bg_sky.fill((c, c, c), None, pygame.BLEND_RGB_ADD)
+        else:
+            self.bg_sky = self.bg_sky_original
+
+        # Apply flash to clouds surface
+        if self.lightning_clouds_intensity > 0:
+            self.bg_clouds = self.bg_clouds_original.copy()
+            c = int(255 * self.lightning_clouds_intensity)
+            self.bg_clouds.fill((c, c, c), None, pygame.BLEND_RGB_ADD)
+        else:
+            self.bg_clouds = self.bg_clouds_original
 
     # Ground detection
     def is_on_ground(self, px, py):
@@ -314,6 +379,7 @@ class Game:
         return True
 
     def update(self, now):
+        self._update_lightning(now)
         self._update_moon_transition(now)
         keys = pygame.key.get_pressed()
         self.player.handle_movement(keys)
