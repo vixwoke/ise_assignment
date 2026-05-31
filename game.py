@@ -88,7 +88,7 @@ class Game:
         self.bullets = BulletManager()
         self.timeline = TimelineManager(self)
 
-        # Civic setup
+        # Civic configuration
         self.civic_x = self.partner.x + 60
         self.civic_y = self.partner.y + 55
         self.civic_hit = False
@@ -158,6 +158,7 @@ class Game:
 
     @staticmethod
     def _load_bg(path, fallback_color=None, alpha=False):
+        """Load a background image, falling back to a solid surface if missing."""
         try:
             img = pygame.image.load(path)
             return img.convert_alpha() if alpha else img.convert()
@@ -169,7 +170,7 @@ class Game:
 
     def _apply_moon_color(self, t):
         self.bg_moon = self.bg_moon_original.copy()
-        # Soft lighter shade of red/pink color limits
+        # Limit color reduction to keep blue and green channels relatively bright (pink-red shade)
         gb = int(255 * (1 - 0.45 * t))
         self.bg_moon.fill((255, gb, gb), None, pygame.BLEND_RGB_MULT)
 
@@ -288,10 +289,11 @@ class Game:
             wounded_scar
         )
         self.partner = Partner(partner_anims)
+        self.partner.y = self.civic_y
         self.bullets = BulletManager()
         self.timeline = TimelineManager(self)
 
-        # Keep Civic baseline configurations unchanged
+        # Reset state configurations
         self.enemy.locked = False
         self.enemy.mode = "chase"
 
@@ -306,6 +308,7 @@ class Game:
         self.enemy.regen_timer = self.start_time
         self.partner.last_shot = self.start_time
 
+        # Reset partner death tracker
         self.partner_death_handled = False
         self.partner_death_time = 0
 
@@ -315,6 +318,7 @@ class Game:
         self.game_end = False
         self.game_result = ""
 
+        # Re-apply moon settings
         self.moon_is_red = False
         self.moon_current_t = 0.0
         self.moon_transition_duration = 0
@@ -373,9 +377,14 @@ class Game:
             e.hurt_from_damage()
 
     def handle_events(self):
+        # Check if inputs are allowed (blocked during cinematic sequences)
+        allow_input = True
+        if self.current_scene == "scene_1" and self.scene1.phase != "combat":
+            allow_input = False
+
         keys = pygame.key.get_pressed()
         moving = False
-        if self.player.can_walk():
+        if allow_input and self.player.can_walk():
             if keys[pygame.K_a] or keys[pygame.K_d]:
                 moving = True
 
@@ -425,7 +434,7 @@ class Game:
                     if self.pause_btn.collidepoint(mouse_pos):
                         self.paused = True
                         self.pause_start_time = pygame.time.get_ticks()
-                    else:
+                    elif allow_input:  # Only allow combat inputs if input is allowed
                         if event.button == 1:
                             if self.debug_enabled and self.moon_btn_rect.collidepoint(event.pos):
                                 self.moon_is_red = not self.moon_is_red
@@ -437,7 +446,7 @@ class Game:
         return True
 
     def update(self, now):
-        # Always evaluate atmospheric visuals at top
+        # Always evaluate atmospheric visuals at the top of update
         self._update_lightning(now)
         self._update_moon_transition(now)
 
@@ -445,7 +454,7 @@ class Game:
             self.scene1.update(now)
             if self.scene1.phase != "combat":
                 self.player.update_gravity(self.is_on_ground)
-                self.enemy.update_gravity(self.is_on_ground, self.player.scale)
+                self.enemy.update_gravity(self.is_on_ground, self.player.scale) 
                 self.player.update_animation()
                 self.enemy.update_animation()
                 self.partner.update_animation()
@@ -628,6 +637,7 @@ class Game:
         DBG_EF = (255, 0, 255)      # Enemy Frame: Magenta
         DBG_EC = (255, 0, 0)        # Enemy Char: Red
 
+        # Streamlined list (excludes Partner bounding boxes)
         rect_list = [
             (pf_rect, DBG_PF, "Player Frame"),
             (p.rect, DBG_PC, "Player Char"),
@@ -656,11 +666,13 @@ class Game:
             info_y += 22
 
     def draw_pause_menu(self):
+        # Draw dark overlay
         overlay = pygame.Surface((WIDTH, HEIGHT))
         overlay.set_alpha(150)
         overlay.fill((0, 0, 0))
         self.screen.blit(overlay, (0, 0))
 
+        # Title
         title_surf = self.font.render("PAUSED", True, (255, 255, 255))
         title_rect = title_surf.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 180))
         self.screen.blit(title_surf, title_rect)
@@ -670,19 +682,23 @@ class Game:
         mute_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 - 100, 300, 50)
         debug_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 + 80, 300, 50)
 
+        # Mute / Unmute Button
         mute_text = "UNMUTE" if self.muted else "MUTE"
         mute_color = (200, 200, 200) if not mute_btn.collidepoint(mouse_pos) else (255, 255, 255)
         mute_surf = self.font.render(mute_text, True, mute_color)
         self.screen.blit(mute_surf, mute_surf.get_rect(center=mute_btn.center))
 
+        # Resume Button
         res_color = (255, 255, 255) if self.resume_btn.collidepoint(mouse_pos) else (200, 200, 200)
         res_surf = self.font.render("RESUME", True, res_color)
         self.screen.blit(res_surf, res_surf.get_rect(center=self.resume_btn.center))
 
+        # Main Menu Button
         menu_color = (255, 50, 50) if self.menu_btn.collidepoint(mouse_pos) else (200, 50, 50)
         menu_surf = self.font.render("MAIN MENU", True, menu_color)
         self.screen.blit(menu_surf, menu_surf.get_rect(center=self.menu_btn.center))
 
+        # Debug Toggle Button
         debug_text = f"DEBUG: {'ON' if self.debug_enabled else 'OFF'}"
         debug_color = (200, 200, 200) if not debug_btn.collidepoint(mouse_pos) else (255, 255, 255)
         debug_surf = self.font.render(debug_text, True, debug_color)
@@ -696,19 +712,24 @@ class Game:
 
             self.handle_events()
 
+            # Break the loop and return to main.py if player clicked MAIN MENU
             if self.return_to_menu:
                 pygame.mixer.music.stop()
                 return
 
+            # Calculate frozen time
             frozen_now = raw_now - self.total_paused_time
 
+            # Only update characters and endings if the game is NOT paused
             if not self.paused:
                 if not self.update_endings(frozen_now):
                     break
                 self.update(frozen_now)
 
+            # Always draw the background game
             self.draw(frozen_now)
 
+            # End game checking
             if self.game_end:
                 pygame.mixer.music.stop()
                 result_type = "victory" if "EXECUTED" in self.game_result else "defeat"
