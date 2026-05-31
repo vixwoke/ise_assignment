@@ -1,4 +1,6 @@
 import math
+from cmath import phase
+
 import pygame
 from config import (
     WIDTH, HEIGHT, FRAME_W, FRAME_H, ENEMY_HP, ENEMY_MAX_HP, ENEMY_SPEED,
@@ -37,14 +39,14 @@ class Enemy:
         self.march = False
         self.locked = False
         self.escape = False
+        self.mode = "chase"
 
-        self.waiting_after_civic = False
+        self.phase = 0
 
-        # OPTIONAL: cleaner phase control
-        self.phase = 0  # 0 = civic, 1 = partner
 
         self.fall_speed = 0
         self.on_ground = False
+        self.waiting_after_civic = False
 
     @property
     def rect(self):
@@ -54,17 +56,13 @@ class Enemy:
         self.action = action
         self.animation = frames
         self.frame_index = 0.0
-        self.has_hit_partner=False
+        self.has_hit_partner = False
 
     def make_wounded(self):
         if self.wounded:
             return
-
         self.wounded = True
-
-        # default wounded sprite before rage
         self.anims = dict(self.wounded_shoot_anims)
-
         self.animation = self.anims["hurt"]
         self.frame_index = 0.0
 
@@ -96,9 +94,6 @@ class Enemy:
             self.make_wounded()
         self.set_animation("hurt", self.anims["hurt"])
 
-    # -------------------------
-    # GRAVITY
-    # -------------------------
     def update_gravity(self, is_on_ground_fn, scale):
         self.fall_speed += GRAVITY
         self.y += self.fall_speed
@@ -115,50 +110,56 @@ class Enemy:
         else:
             self.on_ground = False
 
-    # -------------------------
-    # MAIN AI
-    # -------------------------
-    def update_march(self, now, player_x, partner_x, partner_y, partner_dead,
-                     civic_x, civic_y, target_partner, civic_hit, scale):
+    def update_march(self, now, partner_x, partner_y, partner_dead,
+                     civic_x, civic_y, target_partner, civic_hit, scale, player_x):
 
-        if not self.march or self.dead or self.locked:
+
+        # 🔧 FIX 1: sync old flag with new system
+        self.march = (self.mode == "march")
+
+        # 🔧 FIX 2: REMOVE broken dependency
+        if self.dead or self.locked:
             return civic_x, civic_y, target_partner, civic_hit
 
-        # switch phase after civic hit
+
         if self.waiting_after_civic:
-            self.phase = 1
+            self.phase = 2
             target_partner = True
             self.waiting_after_civic = False
 
-        # escape
         if self.escape:
             self.x -= ESCAPE_SPEED
             self.set_animation("run", self.anims["run"])
             self.facing_right = False
             return civic_x, civic_y, target_partner, civic_hit
 
-        # partner dead — continue attacking on a timer
-        if partner_dead and target_partner:
-            if now - self.attack_timer >= ENEMY_ATTACK_INTERVAL:
-                self.attack_timer = now
-                self.set_animation("attack", self.anims["attack"])
-                self.has_hit_partner = False
-            return civic_x, civic_y, target_partner, civic_hit
+        if partner_dead and self.phase == 2:
+            self.phase = 0
+            target_partner = False
 
-        # -------------------------
-        # TARGETING (FIXED: X ONLY)
-        # -------------------------
-        if partner_dead:
+            if self.action != "idle":
+                self.set_animation("idle", self.anims["idle"])
+
+        # TARGETING
+        if self.mode == "chase":
             tx = player_x
-        elif self.phase == 1:
-            tx = partner_x
-        else:
-            tx = civic_x
+            target_partner = False
+            self.phase = 0   # 🔧 FIX 5
+
+        elif self.mode == "march":
+            target_partner = True
+
+            if self.phase == 1:
+                tx = civic_x
+            elif self.phase == 2:
+                tx = partner_x
+            else:
+                tx = player_x
+
 
         dx = tx - self.x
         distance = abs(dx)
 
-        # MOVE ONLY X
         if distance > 60:
             self.x += ENEMY_SPEED if dx > 0 else -ENEMY_SPEED
             self.action = "walk"
@@ -166,8 +167,18 @@ class Enemy:
             self.facing_right = dx > 0
 
         else:
-                if self.action != "attack":
-                    self.set_animation("attack", self.anims["attack"])
+            if self.action != "attack":
+                self.set_animation("attack", self.anims["attack"])
+
+            current_frame = int(self.frame_index)
+
+            # 🔧 FIX 3: prevent air hit
+
+            if current_frame == 4 and not civic_hit and distance <= 80 and self.mode == "march":
+                civic_x += 100
+                civic_y += 100
+                civic_hit = True
+                self.phase = 2
 
                 current_frame = int(self.frame_index)
                 if current_frame == 4 and not civic_hit:
