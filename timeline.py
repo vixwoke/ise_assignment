@@ -1,6 +1,6 @@
 import pygame
 from config import (
-    ENEMY_TARGET_TIME, RAGE_TRIGGER_TIME, ENDING_TIME, ESCAPE_TIME, ENDGAME_TIME
+    ENEMY_TARGET_TIME, ENEMY_PHASE_1_TIME, RAGE_TRIGGER_TIME, ENDING_TIME, ESCAPE_TIME, ENDGAME_TIME
 )
 
 class TimelineEvent:
@@ -32,18 +32,26 @@ class TimelineManager:
             if not game.enemy.march:
                 game.enemy.march = True
 
-        # Event 2: Player Rage Mode
+        # Event 2: Enemy targets partner
+        def trigger_enemy_phase_1(game):
+            game.target_partner = True
+            game.enemy.phase = 1
+
+        # Event 3: Player Rage Mode
         def trigger_rage_mode(game):
             if not game.player.rage_mode:
                 game.player.activate_rage()
+                game.enemy.hp = game.enemy.max_hp
+                game.enemy.make_normal()
+                game.player.hp = game.player.max_hp
 
-        # Event 3: Ending Sequence Triggered
+        # Event 4: Ending Sequence Triggered
         def trigger_ending(game):
             if not game.ending_triggered:
                 game.ending_triggered = True
                 game.enemy.locked = False
 
-        # Event 4: Enemy Escape Starts
+        # Event 5: Enemy Escape Starts
         def trigger_enemy_escape(game):
             if game.ending_triggered and not game.enemy.dead:
                 game.enemy.escape = True
@@ -52,6 +60,7 @@ class TimelineManager:
                 game.enemy.facing_right = False
 
         self.events.append(TimelineEvent(ENEMY_TARGET_TIME, trigger_enemy_march))
+        self.events.append(TimelineEvent(ENEMY_PHASE_1_TIME, trigger_enemy_phase_1))
         self.events.append(TimelineEvent(RAGE_TRIGGER_TIME, trigger_rage_mode))
         self.events.append(TimelineEvent(ENDING_TIME, trigger_ending))
         self.events.append(TimelineEvent(ESCAPE_TIME, trigger_enemy_escape))

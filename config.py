@@ -35,10 +35,11 @@ ENEMY_CHAR_HITBOX_H = 60
 
 # Gravity
 GRAVITY = 2
-JUMP_FORCE = -20
+JUMP_FORCE = -28
 
 # Player
 PLAYER_SPEED = 5
+AIR_SPEED = 8
 PLAYER_HP = 100.0
 PLAYER_MAX_HP = 100.0
 PLAYER_HIT_COOLDOWN = 1000
@@ -49,7 +50,6 @@ PLAYER_RAGE_REGEN_AMOUNT = 30
 # Player shoot
 MAX_SHOTS = 12
 BULLET_SPEED = 12
-RECHARGE_TIME = 1300
 
 # Player leap
 LEAP_SPEED = 6
@@ -59,8 +59,8 @@ NORMAL_ANIM_SPEED = 0.15
 JUMP_ANIM_SPEED = 0.25
 
 # Enemy
-ENEMY_HP = 100
-ENEMY_MAX_HP = 100
+ENEMY_HP = 3
+ENEMY_MAX_HP = 3
 ENEMY_SPEED = 2
 ENEMY_ANIM_SPEED = 0.15
 ENEMY_ATTACK_INTERVAL = 3000
@@ -69,12 +69,14 @@ ENEMY_PARTNER_DAMAGE = 1
 ENEMY_REGEN_INTERVAL = 5000
 ENEMY_REGEN_AMOUNT = 1
 
-# Enemy march / escape
-ENEMY_TARGET_TIME = 74000
+# Enemy march
+ENEMY_TARGET_TIME = 2000
+ENEMY_PHASE_1_TIME = 20000
+PARTNER_DEATH_PAUSE = 2000
 ESCAPE_SPEED = 5
 
 # Rage mode
-RAGE_TRIGGER_TIME = 89000
+RAGE_TRIGGER_TIME = 50000
 RAGE_SCALE = 1.2
 
 # Ending
@@ -99,11 +101,11 @@ BG_MOON_PATH = "resources/image/elements/moon.png"
 BG_CLOUDS_PATH = "resources/image/background/night-grass-clouds.png"
 BG_ROCKS_PATH = "resources/image/background/night-grass-rocks.png"
 BG_GROUND_PATH = "resources/image/background/night-grass-ground.png"
-
-# Moon position
-MOON_X = 700
-MOON_Y = 100
-MOON_SCALE_W = 200
+BG_MENU_PATH = "resources/image/background/menu_bg.png"
+# Moon position and size
+MOON_X = 600
+MOON_Y = 0
+MOON_SCALE_W = 400
 
 # Font
 FONT_NAME = "vcrosdmono"
@@ -112,8 +114,11 @@ FONT_SIZE = 35
 # Asset paths
 PLAYER_PATH = "resources/image/sprites/maincharacter/"
 RAGE_PATH = "resources/image/sprites/rageCharacter/"
+Wounded_Player_PATH="resources/image/sprites/maincharacterWounded/"
+Wounded_Rage_PATH="resources/image/sprites/rageCharacterWounded/"
 ENEMY_PATH = "resources/image/sprites/enemy/"
-WOUNDED_ENEMY_PATH = "resources/image/sprites/woundedEnemy/"
+WOUNDED_Shoot_ENEMY_PATH = "resources/image/sprites/woundedEnemyShoot/"
+WOUNDED_Scar_ENEMY_PATH = "resources/image/sprites/woundedEnemyScar/"
 PARTNER_PATH = "resources/image/sprites/partner/"
 MUSIC_PATH = "resources/audio/musics/waking demon.mp3"
 MUSIC_VOLUME = 0.0

@@ -3,16 +3,21 @@ import random
 from config import (
     WIDTH, HEIGHT, FRAME_W, FRAME_H, PLAYER_SPEED, PLAYER_HP, PLAYER_MAX_HP,
     PLAYER_HIT_COOLDOWN, PLAYER_REGEN_INTERVAL, PLAYER_REGEN_AMOUNT,
-    PLAYER_RAGE_REGEN_AMOUNT, MAX_SHOTS, RECHARGE_TIME,
+    PLAYER_RAGE_REGEN_AMOUNT, MAX_SHOTS,
     LEAP_SPEED, NORMAL_ANIM_SPEED, JUMP_ANIM_SPEED, RAGE_SCALE, DEFAULT_SCALE,
     GRAVITY, JUMP_FORCE,
     PLAYER_CHAR_OFFSET_X, PLAYER_CHAR_OFFSET_Y,
     PLAYER_CHAR_HITBOX_W, PLAYER_CHAR_HITBOX_H,
+    AIR_SPEED,
 )
 
 
 class Player:
-    def __init__(self, anims, rage_anims):
+    def __init__(self,
+        normal_anims,
+        wounded_anims,
+        rage_anims,
+        wounded_rage_anims):
         self.x = WIDTH // 4 + PLAYER_CHAR_OFFSET_X
         self.y = HEIGHT // 2 + PLAYER_CHAR_OFFSET_Y
         self.speed = PLAYER_SPEED
@@ -22,10 +27,16 @@ class Player:
         self.max_hp = PLAYER_MAX_HP
         self.dead = False
 
-        self.anims = anims
-        self.rage_anims = rage_anims
+        self.normal_anims = normal_anims
+        self.wounded_anims = wounded_anims
+
+        self.rage_normal_anims = rage_anims
+        self.rage_wounded_anims = wounded_rage_anims
+
+
+        self.anims = self.normal_anims
+        self.animation = self.anims["idle"]  # ✅ FIXED
         self.action = "idle"
-        self.animation = anims["idle"]
         self.frame_index = 0.0
 
         self.rage_mode = False
@@ -33,7 +44,6 @@ class Player:
 
         self.shots = MAX_SHOTS
         self.recharging = False
-        self.recharge_start = 0
 
         self.leaping = False
         self.leap_dx = 0
@@ -48,15 +58,64 @@ class Player:
         self.fall_speed = 0
         self.on_ground = True
 
+        # Player Audio
+        self.snd_gun = pygame.mixer.Sound("resources/audio/gun.wav")
+        self.snd_gun.set_volume(0.4)
+        self.snd_reload = pygame.mixer.Sound("resources/audio/reload.wav")
+        self.snd_reload.set_volume(0.4)
+        self.snd_howl = pygame.mixer.Sound("resources/audio/howl.wav")
+        self.snd_howl.set_volume(0.8)
+        # Collision Audio
+        self.snd_melee = pygame.mixer.Sound("resources/audio/melee_hit.wav")
+        self.snd_melee.set_volume(0.4)
+        self._original_volumes = {
+            "gun": 0.4,
+            "reload": 0.4,
+            "howl": 0.8,
+            "melee": 0.4,
+        }
+
+    def mute(self):
+        self.snd_gun.set_volume(0)
+        self.snd_reload.set_volume(0)
+        self.snd_howl.set_volume(0)
+        self.snd_melee.set_volume(0)
+
+    def unmute(self):
+        self.snd_gun.set_volume(self._original_volumes["gun"])
+        self.snd_reload.set_volume(self._original_volumes["reload"])
+        self.snd_howl.set_volume(self._original_volumes["howl"])
+        self.snd_melee.set_volume(self._original_volumes["melee"])
+
     # Action predicates
     def can_walk(self):
-        return self.action not in ["shoot", "attack", "recharge", "hurt", "dead"]
+        return self.action not in ["recharge", "hurt", "dead"]
 
     def can_shoot(self):
-        return self.action not in ["shoot", "attack", "recharge", "jump", "hurt", "dead"]
+        return not self.recharging and self.action not in ["shoot", "attack", "recharge", "hurt", "dead"]
 
     def can_attack(self):
         return self.action not in ["shoot", "attack", "jump", "hurt", "dead"]
+
+    def update_wounded_sprite(self):
+        wounded = self.hp < (self.max_hp)
+
+        if self.rage_mode:
+            new_set = self.rage_wounded_anims if wounded else self.rage_normal_anims
+        else:
+            new_set = self.wounded_anims if wounded else self.normal_anims
+
+        if self.anims != new_set:
+            self.anims = new_set
+
+            # keep current action valid
+            if self.action in self.anims:
+                self.animation = self.anims[self.action]
+                self.frame_index = min(self.frame_index, len(self.animation) - 1)
+            else:
+                self.action = "idle"
+                self.animation = self.anims["idle"]
+                self.frame_index = 0.0
 
     def set_animation(self, action, frames):
         if self.action != action:
@@ -73,15 +132,13 @@ class Player:
 
     def activate_rage(self):
         self.rage_mode = True
-        self.anims["idle"] = self.rage_anims["idle"]
-        self.anims["walk"] = self.rage_anims["walk"]
-        self.anims["jump"] = self.rage_anims["jump"]
-        self.anims["attack"] = self.rage_anims["attack"]
-        self.anims["hurt"] = self.rage_anims["hurt"]
-        self.anims["dead"] = self.rage_anims["dead"]
-        self.anims["shoot"] = self.rage_anims["shoot"]
         self.scale = RAGE_SCALE
-        self.set_animation("attack", self.anims["attack"])
+
+        # force correct set immediately
+        self.anims = self.rage_wounded_anims if self.hp < self.max_hp  else self.rage_normal_anims
+
+        self.set_animation("idle", self.anims["idle"])
+        self.snd_howl.play()
 
     @property
     def regen_amount(self):
@@ -124,7 +181,7 @@ class Player:
             self.on_ground = False
 
     def handle_jump(self, keys):
-        if self.can_walk() and keys[pygame.K_SPACE] and self.on_ground:
+        if self.can_walk() and self.action not in ["attack"] and keys[pygame.K_SPACE] and self.on_ground:
             self.fall_speed = JUMP_FORCE
             self.set_animation("jump", self.anims["jump"])
             self.on_ground = False
@@ -133,14 +190,15 @@ class Player:
     def handle_movement(self, keys):
         if not self.can_walk():
             return
+        speed = AIR_SPEED if not self.on_ground else self.speed
         dx = 0
         moving = False
         if keys[pygame.K_a]:
-            dx = -self.speed
+            dx = -speed
             moving = True
             self.facing_right = False
         if keys[pygame.K_d]:
-            dx = self.speed
+            dx = speed
             moving = True
             self.facing_right = True
         self.x += dx
@@ -152,13 +210,13 @@ class Player:
 
     def handle_shoot(self, bullet_manager, moving):
         if not self.rage_mode:
-            if self.can_shoot() and not moving:
+            if self.can_shoot():
                 if self.shots <= 0:
                     self.recharging = True
-                    self.recharge_start = pygame.time.get_ticks()
                     self.set_animation("recharge", self.anims["recharge"])
                 else:
                     self.shots -= 1
+                    self.snd_gun.play()
                     self.set_animation("shoot", self.anims["shoot"])
                     bullet_manager.add_player_bullet(
                         self.x + 40, self.y + 35, self.facing_right
@@ -175,10 +233,12 @@ class Player:
     def handle_attack(self):
         if not self.can_attack():
             return
+
         self.recharging = False
         self.attack_has_hit = False
+
         if self.rage_mode:
-            chosen = random.choice(self.rage_anims["attack_list"])
+            chosen = random.choice(self.rage_normal_anims["attack_list"])
             self.set_animation("attack", chosen)
         else:
             self.set_animation("attack", self.anims["attack"])
@@ -193,12 +253,11 @@ class Player:
             self.x += self.leap_dx
             self.y += self.leap_dy
 
-    def update_recharge(self, now):
-        if self.recharging and now - self.recharge_start >= RECHARGE_TIME:
+    def finish_recharge(self):
+        if self.recharging:
             self.recharging = False
             self.shots = MAX_SHOTS
-            if self.action == "recharge":
-                self.set_animation("idle", self.anims["idle"])
+            self.snd_reload.play()
 
     def update_regen(self, now):
         if now - self.regen_timer >= PLAYER_REGEN_INTERVAL:
@@ -213,6 +272,7 @@ class Player:
             return False
         self.last_hit_time = now
         self.hp -= damage
+        self.snd_melee.play()
         if self.hp <= 0:
             self.hp = 0
             self.dead = True
@@ -252,6 +312,9 @@ class Player:
             elif self.action == "dead":
                 self.frame_index = len(self.animation) - 1
             elif self.action == "hurt":
+                self.set_animation("idle", self.anims["idle"])
+            elif self.action == "recharge":
+                self.finish_recharge()
                 self.set_animation("idle", self.anims["idle"])
             else:
                 self.set_animation("idle", self.anims["idle"])
