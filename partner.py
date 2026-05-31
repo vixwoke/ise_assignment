@@ -1,7 +1,9 @@
 import pygame
 from config import (
     WIDTH, HEIGHT, FRAME_W, FRAME_H, PARTNER_HP, PARTNER_ANIM_SPEED,
-    PARTNER_SHOT_INTERVAL,
+    PARTNER_SHOT_INTERVAL, GRAVITY, JUMP_FORCE,
+    PLAYER_CHAR_OFFSET_X, PLAYER_CHAR_OFFSET_Y,
+    PLAYER_CHAR_HITBOX_W, PLAYER_CHAR_HITBOX_H
 )
 
 
@@ -18,6 +20,20 @@ class Partner:
         self.frame_index = 0.0
 
         self.last_shot = 0
+
+        # Gravity & Physics properties
+        self.fall_speed = 0
+        self.scale = 0.9
+        self.on_ground = False
+
+    @property
+    def rect(self):
+        # Character box matches player's hitbox dimensions
+        return pygame.Rect(
+            self.x, self.y,
+            int(PLAYER_CHAR_HITBOX_W * self.scale),
+            int(PLAYER_CHAR_HITBOX_H * self.scale),
+        )
 
     def set_animation(self, action, frames):
         if self.action != action:
@@ -56,9 +72,12 @@ class Partner:
         frame = self.animation[int(self.frame_index)]
         frame = pygame.transform.scale(
             frame,
-            (int(FRAME_W * 0.9), int(FRAME_H * 0.9)),
+            (int(FRAME_W * self.scale), int(FRAME_H * self.scale)),
         )
-        screen.blit(frame, (self.x, self.y))
+        # Offset drawing to align with top-left of hitbox
+        frame_x = self.x - PLAYER_CHAR_OFFSET_X * self.scale
+        frame_y = self.y - PLAYER_CHAR_OFFSET_Y * self.scale
+        screen.blit(frame, (frame_x, frame_y))
 
     # Gravity
     def update_gravity(self, is_on_ground_fn):
@@ -78,7 +97,7 @@ class Partner:
             self.on_ground = False
 
     def handle_jump(self, keys):
-        if self.can_walk() and keys[pygame.K_SPACE] and self.on_ground:
+        if self.on_ground and keys[pygame.K_SPACE]:
             self.fall_speed = JUMP_FORCE
             self.set_animation("jump", self.anims["jump"])
             self.on_ground = False

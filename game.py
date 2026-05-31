@@ -22,6 +22,7 @@ from player import Player
 from enemy import Enemy
 from partner import Partner
 from bullets import BulletManager
+from scene_1 import Scene1Manager
 
 
 class Game:
@@ -74,9 +75,9 @@ class Game:
         self.bullets = BulletManager()
         self.timeline = TimelineManager(self)
 
-        # Civic
-        self.civic_x = self.partner.x + 60
-        self.civic_y = self.partner.y + 55
+        # Civic configuration
+        self.civic_x = 30 + 60
+        self.civic_y = (HEIGHT - 180) + 55
         self.civic_hit = False
         self.target_partner = False
 
@@ -104,6 +105,10 @@ class Game:
         self.kill = False
         self.game_end = False
         self.game_result = ""
+
+        # Scene 1 Initialization
+        self.current_scene = "scene_1"
+        self.scene1 = Scene1Manager(self)
 
     @staticmethod
     def _load_bg(path, fallback_color=None, alpha=False):
@@ -156,16 +161,58 @@ class Game:
 
     # Ground detection
     def is_on_ground(self, px, py):
-        if 0 <= px < WIDTH and 0 <= py < HEIGHT:
-            return self.bg_ground.get_at((int(px), int(py))).a > 0
-        # If off screen bottom, treat as ground (prevents falling forever)
+        # Clamps coordinates when checking ground off-screen horizontally
+        clamped_x = max(0, min(WIDTH - 1, px))
+        if 0 <= py < HEIGHT:
+            return self.bg_ground.get_at((int(clamped_x), int(py))).a > 0
         if py >= HEIGHT:
             return True
         return False
 
-    # Ending / execution system (Now delegated to self.timeline)
     def update_endings(self, now):
+        if self.current_scene == "scene_1":
+            return True
         return self.timeline.update(now)
+
+    def reset_for_combat(self):
+        """Resets variables back to combat defaults."""
+        player_anims = load_player_anims()
+        rage_anims = load_rage_anims()
+        enemy_normal, enemy_wounded = load_enemy_anims()
+        partner_anims = load_partner_anims()
+
+        self.player = Player(player_anims, rage_anims)
+        self.enemy = Enemy(enemy_normal, enemy_wounded)
+        self.partner = Partner(partner_anims)
+        self.bullets = BulletManager()
+        self.timeline = TimelineManager(self)
+
+        # Relocate the civic to y 490 in the combat scene
+        self.civic_x = self.partner.x + 60
+        self.civic_y = 490
+        
+        self.civic_hit = False
+        self.target_partner = False
+
+        self.start_time = pygame.time.get_ticks()
+        self.enemy_start_time = self.start_time
+        self.player.regen_timer = self.start_time
+        self.player.last_hit_time = 0
+        self.enemy.attack_timer = self.start_time
+        self.enemy.regen_timer = self.start_time
+        self.partner.last_shot = self.start_time
+
+        self.ending_triggered = False
+        self.can_kill = False
+        self.kill = False
+        self.game_end = False
+        self.game_result = ""
+
+        # Re-apply moon settings
+        self.moon_is_red = False
+        self.moon_current_t = 0.0
+        self.moon_transition_duration = 0
+        self._apply_moon_color(0.0)
 
     def check_execution(self):
         p = self.player
@@ -220,26 +267,45 @@ class Game:
             e.hurt_from_damage()
 
     def handle_events(self):
+        allow_input = True
+        if self.current_scene == "scene_1" and self.scene1.phase != "combat":
+            allow_input = False
+
         keys = pygame.key.get_pressed()
         moving = False
-        if self.player.can_walk():
+        if allow_input and self.player.can_walk():
             if keys[pygame.K_a] or keys[pygame.K_d]:
                 moving = True
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
-                    if DEBUG and self.moon_btn_rect.collidepoint(event.pos):
-                        self.moon_is_red = not self.moon_is_red
-                        self.moon_red(self.moon_is_red, 1000)
-                    else:
-                        self.player.handle_shoot(self.bullets, moving)
-                if event.button == 3:
-                    self.player.handle_attack()
+            if allow_input:
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 1:
+                        if DEBUG and self.moon_btn_rect.collidepoint(event.pos):
+                            self.moon_is_red = not self.moon_is_red
+                            self.moon_red(self.moon_is_red, 1000)
+                        else:
+                            self.player.handle_shoot(self.bullets, moving)
+                    if event.button == 3:
+                        self.player.handle_attack()
         return True
 
     def update(self, now):
+        if self.current_scene == "scene_1":
+            self.scene1.update(now)
+            # Standard gravity and animation simulation during non-combat phases
+            if self.scene1.phase != "combat":
+                self.player.update_gravity(self.is_on_ground)
+                self.partner.update_gravity(self.is_on_ground)
+                self.enemy.update_gravity(self.is_on_ground, self.player.scale)
+                self.player.update_animation()
+                self.enemy.update_animation()
+                self.partner.update_animation()
+                return
+
+        # General calculations loop
         self._update_moon_transition(now)
         keys = pygame.key.get_pressed()
         self.player.handle_movement(keys)
@@ -269,12 +335,13 @@ class Game:
                 self.player.scale,
             )
 
-        # Enemy escape end
+        # Escape logic
         if self.enemy.escape and self.enemy.x < -200:
-            self.game_end = True
-            self.game_result = "ENEMY ESCAPED"
+            if self.current_scene == "combat":
+                self.game_end = True
+                self.game_result = "ENEMY ESCAPED"
 
-        # Enemy damage
+        # Damage execution
         self.enemy.damage_player(self.player, now)
         if self.target_partner:
             self.enemy.damage_partner(self.partner, now)
@@ -293,7 +360,7 @@ class Game:
         self.partner.update_animation()
 
     def draw(self, now):
-        # Layered backgrounds: sky → moon → clouds → rocks → ground
+        # Background: sky → moon → clouds → rocks → ground
         self.screen.blit(self.bg_sky, (0, 0))
         self.screen.blit(self.bg_moon, (MOON_X, MOON_Y))
         self.screen.blit(self.bg_clouds, (0, 0))
@@ -303,7 +370,11 @@ class Game:
         self.enemy.draw(self.screen, self.player.scale)
         self.player.draw(self.screen)
         self.bullets.draw_player_bullets(self.screen)
-        self.screen.blit(self.civic_img, (self.civic_x, self.civic_y))
+
+        # Only draw the civic vehicle if outside of Scene 1
+        if self.current_scene != "scene_1":
+            self.screen.blit(self.civic_img, (self.civic_x, self.civic_y))
+
         self.partner.draw(self.screen)
         self.bullets.draw_partner_bullets(self.screen)
 
@@ -313,6 +384,10 @@ class Game:
             self.draw_debug_rects()
         else:
             self.draw_ui(now)
+
+        # Overlay rendering
+        if self.current_scene == "scene_1" and self.scene1.fade_alpha > 0:
+            self.scene1.draw_fade(self.screen)
 
         pygame.display.flip()
 
@@ -407,12 +482,31 @@ class Game:
         DBG_EF = (255, 0, 255)      # Enemy Frame: Magenta
         DBG_EC = (255, 0, 0)        # Enemy Char: Red
 
-        for rect, color, label in [
-            (pf_rect, DBG_PF, "Player Frame"),
-            (p.rect, DBG_PC, "Player Char"),
-            (ef_rect, DBG_EF, "Enemy Frame"),
-            (e.rect, DBG_EC, "Enemy Char"),
-        ]:
+        # Render Cyan Partner Frame and Char boxes only during Scene 1
+        if self.current_scene == "scene_1":
+            pt_rect = pygame.Rect(
+                int(self.partner.x),
+                int(self.partner.y),
+                int(FRAME_W * self.partner.scale),
+                int(FRAME_H * self.partner.scale),
+            )
+            rect_list = [
+                (pf_rect, DBG_PF, "Player Frame"),
+                (p.rect, DBG_PC, "Player Char"),
+                (ef_rect, DBG_EF, "Enemy Frame"),
+                (e.rect, DBG_EC, "Enemy Char"),
+                (pt_rect, (0, 255, 255), "Partner Frame"),
+                (self.partner.rect, (0, 150, 255), "Partner Char"),
+            ]
+        else:
+            rect_list = [
+                (pf_rect, DBG_PF, "Player Frame"),
+                (p.rect, DBG_PC, "Player Char"),
+                (ef_rect, DBG_EF, "Enemy Frame"),
+                (e.rect, DBG_EC, "Enemy Char"),
+            ]
+
+        for rect, color, label in rect_list:
             pygame.draw.rect(s, color, rect, 2)
             s.blit(self.debug_font.render(label, True, color), (rect.x + 2, rect.y + 2))
             for cx, cy in [
@@ -423,14 +517,9 @@ class Game:
             ]:
                 pygame.draw.circle(s, color, (cx, cy), 4)
 
-        # Info panel at top-right
+        # Info panel text overlay at the top-right
         info_y = 20
-        for rect, color, label in [
-            (pf_rect, DBG_PF, "Player Frame"),
-            (p.rect, DBG_PC, "Player Char"),
-            (ef_rect, DBG_EF, "Enemy Frame"),
-            (e.rect, DBG_EC, "Enemy Char"),
-        ]:
+        for rect, color, label in rect_list:
             s.blit(self.debug_info_font.render(
                 f"{label}: ({rect.x},{rect.y}) {rect.w}x{rect.h}",
                 True, color,

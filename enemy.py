@@ -46,9 +46,10 @@ class Enemy:
         return pygame.Rect(self.x, self.y, ENEMY_CHAR_HITBOX_W, ENEMY_CHAR_HITBOX_H)
 
     def set_animation(self, action, frames):
-        self.action = action
-        self.animation = frames
-        self.frame_index = 0.0
+        if self.action != action:
+            self.action = action
+            self.animation = frames
+            self.frame_index = 0.0
 
     def make_wounded(self):
         if self.wounded:
