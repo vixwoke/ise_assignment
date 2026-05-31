@@ -85,7 +85,7 @@ class MainMenu:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     mouse_clicked = True
 
-            self.draw_text_center("MOON RACE", self.title_font, (255, 50, 50), 150)
+            self.draw_text_center("WAKING DEMON", self.title_font, (255, 50, 50), 150)
 
             # ---------------------------------------------------------
             # STATE: MAIN MENU

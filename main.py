@@ -7,7 +7,7 @@ from config import WIDTH, HEIGHT
 if __name__ == "__main__":
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Moon Race")
+    pygame.display.set_caption("WAKING DEMON")
 
     while True:
         # 1. Boot the Main Menu
