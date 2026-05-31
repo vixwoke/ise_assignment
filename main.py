@@ -20,7 +20,7 @@ if __name__ == "__main__":
             intro = IntroCutscene(screen, pygame.font.Font(None, 36))
             next_scene = intro.run()
 
-            # When the cutscene finishes, start the actual game
-            if next_scene == "start_game":
+            # TRAPS the game in a loop so Play Again bypasses the menu
+            while next_scene in ["start_game", "play_again"]:
                 game = Game()
-                game.run() # When the player dies or quits loop  back to the menu
+                next_scene = game.run()

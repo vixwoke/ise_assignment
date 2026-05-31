@@ -147,6 +147,18 @@ class Game:
         self.snd_ui.set_volume(0.6)
         # End Screen
         self.end_screen = EndScreen(self.screen, self.font)
+        self.damage_flash_alpha = 0
+
+        # 1. Rain System
+        self.rain_drops = []
+        for _ in range(120):  # Create 120 raindrops
+            rx = random.randint(-200, WIDTH)
+            ry = random.randint(-HEIGHT, HEIGHT)
+            speed = random.randint(15, 25)
+            self.rain_drops.append([rx, ry, speed])
+
+        # 2. Screen Shake Tracker
+        self.shake_frames = 0
     @staticmethod
     def _load_bg(path, fallback_color=None, alpha=False):
         """Load a background image, falling back to a solid surface if missing."""
@@ -162,6 +174,7 @@ class Game:
     def _apply_moon_color(self, t):
         self.bg_moon = self.bg_moon_original.copy()
         gb = int(255 * (1 - t))
+        gb = max(0, min(255, gb))
         self.bg_moon.fill((255, gb, gb), None, pygame.BLEND_RGB_MULT)
 
     def moon_red(self, enable, duration=0):
@@ -381,6 +394,9 @@ class Game:
     def update(self, now):
         self._update_lightning(now)
         self._update_moon_transition(now)
+        if self.player.rage_mode and not self.moon_is_red:
+            self.moon_is_red = True
+            self.moon_red(True, 2000)
         keys = pygame.key.get_pressed()
         self.player.handle_movement(keys)
         self.player.handle_jump(keys)
@@ -388,7 +404,26 @@ class Game:
         self.player.update_gravity(self.is_on_ground)
         self.player.clamp_to_screen()
         self.player.update_regen(now)
+        # --- PLAYER DEATH LOGIC ---
+        if self.player.dead:
+            # Wait for the body to hit the floor, then GAME OVER
+            if self.player.frame_index >= len(self.player.animation) - 1:
+                self.game_end = True
+                self.game_result = "YOU DIED"
 
+        # --- DAMAGE FLASH EFFECT ---
+        if now - self.player.last_hit_time < 150 and self.player.hp > 0:
+            self.damage_flash_alpha = 100
+            self.shake_frames = 10
+        else:
+            self.damage_flash_alpha = max(0, self.damage_flash_alpha - 5)  # Fade out smoothly
+        #rain
+        for drop in self.rain_drops:
+            drop[0] += drop[2] // 4  # Wind pushes rain slightly right
+            drop[1] += drop[2]  # Rain falls down
+            if drop[1] > HEIGHT or drop[0] > WIDTH:
+                drop[0] = random.randint(-200, WIDTH)
+                drop[1] = random.randint(-200, 0)
         # Player bullets
         if self.bullets.update_player_bullets(self.enemy.rect):
             if not self.enemy.dead:
@@ -462,6 +497,40 @@ class Game:
         self.partner.draw(self.screen)
         self.bullets.draw_partner_bullets(self.screen)
 
+        # 1. DRAW DAMAGE FLASH
+        if self.damage_flash_alpha > 0:
+            flash_surf = pygame.Surface((WIDTH, HEIGHT))
+            flash_surf.fill((255, 0, 0))
+            flash_surf.set_alpha(self.damage_flash_alpha)
+            self.screen.blit(flash_surf, (0, 0))
+
+        #  2. DRAW HEALTH blur
+        # As HP drops, the screen gets darker and more claustrophobic
+        if self.player.hp > 0:
+            hp_percent = self.player.hp / self.player.max_hp
+            vignette_alpha = int(180 * (1.0 - hp_percent))  # Max darkness is 180
+            if vignette_alpha > 0:
+                vig_surf = pygame.Surface((WIDTH, HEIGHT))
+                vig_surf.fill((0, 0, 0))
+                vig_surf.set_alpha(vignette_alpha)
+                self.screen.blit(vig_surf, (0, 0))
+
+        # 3. DRAW RAIN
+        for drop in self.rain_drops:
+            pygame.draw.line(self.screen, (150, 150, 180), (drop[0], drop[1]), (drop[0] + drop[2] // 4, drop[1] + 30),
+                             2)
+
+        # 4 SCREEN SHAKE
+        if self.shake_frames > 0:
+            self.shake_frames -= 1
+            # Copy the screen, black it out, and paste it back slightly offset!
+            shake_offset_x = random.randint(-8, 8)
+            shake_offset_y = random.randint(-8, 8)
+            shake_copy = self.screen.copy()
+            self.screen.fill((0, 0, 0))
+            self.screen.blit(shake_copy, (shake_offset_x, shake_offset_y))
+
+
         if self.debug_enabled:
             self.draw_debug_grid()
             self.draw_debug_ui(now)
@@ -492,6 +561,68 @@ class Game:
         p = self.player
         s = self.screen
         f = self.font
+
+        # PLAYER VITALS
+        name_label = self.debug_info_font.render("JOHN HP", True, (200, 200, 200))
+        s.blit(name_label, (20, 15))
+
+        pygame.draw.rect(s, (50, 50, 50), (20, 35, 200, 20))
+        if p.hp > 0:
+            hp_ratio = p.hp / p.max_hp
+            color = (50, 255, 50) if hp_ratio > 0.3 else (255, 50, 50)
+            pygame.draw.rect(s, color, (20, 35, int(200 * hp_ratio), 20))
+        pygame.draw.rect(s, (200, 200, 200), (20, 35, 200, 20), 2)
+
+        if p.rage_mode:
+            s.blit(f.render("RAGE MODE", True, (255, 40, 40)), (20, 65))
+        else:
+            # AMMOLabel
+            s.blit(self.debug_info_font.render("AMMO:", True, (200, 200, 200)), (20, 65))
+            for i in range(12):
+                color = (255, 200, 50) if i < p.shots else (100, 100, 100)
+                # Shifted the bullets slightly right to make room for the label
+                pygame.draw.rect(s, color, (80 + (i * 15), 65, 10, 15))
+
+            # Flashing RELOADINGAlert
+            if p.shots == 0 and int(now / 250) % 2 == 0:
+                s.blit(self.debug_info_font.render("RELOADING...", True, (255, 50, 50)), (270, 65))
+
+        # SURVIVAL BOSS BAR
+        elapsed = now - self.start_time
+        if elapsed < ENDING_TIME:
+            progress = elapsed / ENDING_TIME
+            bar_w = 400
+            bar_x = WIDTH // 2 - bar_w // 2
+
+            title = self.debug_info_font.render("MOON INFLUENCE (SURVIVE!)", True, (200, 200, 200))
+            s.blit(title, (WIDTH // 2 - title.get_width() // 2, 15))
+
+            pygame.draw.rect(s, (30, 30, 30), (bar_x, 35, bar_w, 15))
+            pygame.draw.rect(s, (150, 50, 100), (bar_x, 35, int(bar_w * progress), 15))
+            pygame.draw.rect(s, (150, 150, 150), (bar_x, 35, bar_w, 15), 2)
+
+        else:
+            if int(now / 500) % 2 == 0:
+                exec_text = f.render("EXECUTE THE BEAST!", True, (255, 50, 50))
+                s.blit(exec_text, (WIDTH // 2 - exec_text.get_width() // 2, 20))
+
+        #  PARTNER STATUS & GAME OVER
+        if not self.partner.dead:
+            s.blit(self.debug_info_font.render("PARTNER HP:", True, (200, 200, 200)), (20, HEIGHT - 40))
+            for i in range(int(self.partner.hp)):
+                pygame.draw.rect(s, (255, 50, 50), (120 + (i * 25), HEIGHT - 40, 15, 15))
+
+        if self.game_end:
+            text = f.render(self.game_result, True, (255, 50, 50))
+            s.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2))
+
+        # ENEMY HP
+
+        enemy_hp_text = f"BEAST HP: {int(self.enemy.hp)}"
+        enemy_hp_surf = self.debug_info_font.render(enemy_hp_text, True, (255, 100, 100))
+        s.blit(enemy_hp_surf, (WIDTH - enemy_hp_surf.get_width() - 20, 15))
+
+
 
         if p.rage_mode:
             s.blit(f.render("RAGE MODE", True, (255, 40, 40)), (20, 220))
@@ -656,12 +787,17 @@ class Game:
             # Always draw the background game
             self.draw(frozen_now)
 
-            # --- THE END SCREEN INTERCEPT ---
+            # ---  END SCREEN  ---
             if self.game_end:
                 pygame.mixer.music.stop()  # Stop the intense Scene 2 music
 
-                # Figure out if they won or lost based on the string
-                result_type = "victory" if "EXECUTED" in self.game_result else "defeat"
+                # Figure out if they won, lost, or died
+                if "EXECUTED" in self.game_result:
+                    result_type = "victory"
+                elif "ESCAPED" in self.game_result:
+                    result_type = "defeat"
+                else:
+                    result_type = "game_over"
 
                 # Run the screen and return their choice (play_again or main_menu)
                 choice = self.end_screen.run(result_type)
