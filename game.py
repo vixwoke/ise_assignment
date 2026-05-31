@@ -1,10 +1,11 @@
 from timeline import TimelineManager
 import pygame
+import random
 import sys
 from config import (
-    WIDTH, HEIGHT, FPS, FRAME_W, FRAME_H, RAGE_TRIGGER_TIME,
+    WIDTH, HEIGHT, FPS, FRAME_W, FRAME_H,
     ENDING_TIME, ESCAPE_TIME, ENDGAME_TIME, ENEMY_TARGET_TIME, MUSIC_PATH,
-    MUSIC_VOLUME, FONT_NAME, FONT_SIZE, DEBUG,
+    MUSIC_VOLUME, FONT_NAME, FONT_SIZE, DEBUG, PARTNER_DEATH_PAUSE,
     BG_SKY_PATH, BG_MOON_PATH, BG_CLOUDS_PATH, BG_ROCKS_PATH, BG_GROUND_PATH,
     MOON_X, MOON_Y, MOON_SCALE_W,
     PLAYER_CHAR_OFFSET_X, PLAYER_CHAR_OFFSET_Y,
@@ -22,6 +23,7 @@ from player import Player
 from enemy import Enemy
 from partner import Partner
 from bullets import BulletManager
+from end_screen import EndScreen
 from scene_1 import Scene1Manager
 
 
@@ -33,8 +35,8 @@ class Game:
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("maingame.py")
         try:
-            pygame.mixer.music.load(MUSIC_PATH)
-            pygame.mixer.music.set_volume(MUSIC_VOLUME)
+            pygame.mixer.music.load("resources/audio/musics/waking demon.mp3")
+            pygame.mixer.music.set_volume(0.5)
             pygame.mixer.music.play(-1)
         except FileNotFoundError:
             pass
@@ -61,22 +63,35 @@ class Game:
         self.bg_moon_original = pygame.transform.scale(moon_raw, (self.moon_w, self.moon_h))
         self.bg_moon = self.bg_moon_original.copy()
 
+        # Originals for lightning flash effect
+        self.bg_sky_original = self.bg_sky.copy()
+        self.bg_clouds_original = self.bg_clouds.copy()
+
         # Load assets
-        player_anims = load_player_anims()
-        rage_anims = load_rage_anims()
-        enemy_normal, enemy_wounded = load_enemy_anims()
+        player_normal, player_wounded = load_player_anims()
+        rage_normal, rage_wounded = load_rage_anims()
+        enemy_normal, wounded_shoot, wounded_scar = load_enemy_anims()
         partner_anims = load_partner_anims()
         self.civic_img = load_civic_img()
 
         # Entities
-        self.player = Player(player_anims, rage_anims)
-        self.enemy = Enemy(enemy_normal, enemy_wounded)
+        self.player = Player(
+            player_normal,
+            player_wounded,
+            rage_normal,
+            rage_wounded
+        )
+        self.enemy = Enemy(
+            enemy_normal,
+            wounded_shoot,
+            wounded_scar
+        )
         self.partner = Partner(partner_anims)
         self.bullets = BulletManager()
         self.timeline = TimelineManager(self)
 
         # Civic configuration
-        self.civic_x = 30 + 60
+        self.civic_x = self.partner.x + 60
         self.civic_y = (HEIGHT - 180) + 55
         self.civic_hit = False
         self.target_partner = False
@@ -97,7 +112,19 @@ class Game:
         self.moon_transition_duration = 0
         self.moon_start_t = 0.0
         self.moon_target_t = 0.0
-        self.moon_btn_rect = pygame.Rect(WIDTH - 150, 20, 160, 30)
+        self.moon_btn_rect = pygame.Rect(WIDTH - 150, 55, 160, 30)
+
+        # Lightning animation (sky & clouds flash)
+        self.lightning_state = "idle"
+        self.lightning_state_timer = self.start_time + random.randint(3000, 8000)
+        self.lightning_sky_intensity = 0.0
+        self.lightning_clouds_intensity = 0.0
+        self.lightning_remaining_flashes = 0
+        self.lightning_cloud_delay = 0
+
+        # Partner death tracking
+        self.partner_death_handled = False
+        self.partner_death_time = 0
 
         # Ending
         self.ending_triggered = False
@@ -106,7 +133,27 @@ class Game:
         self.game_end = False
         self.game_result = ""
 
-        # Scene 1 Initialization
+        # Pause Functionality
+        self.paused = False
+        self.pause_start_time = 0
+        self.total_paused_time = 0
+        self.return_to_menu = False
+        self.muted = False
+        self.debug_enabled = DEBUG
+        self.resume_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 - 40, 300, 50)
+        self.menu_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 + 20, 300, 50)
+        
+        # Pause button on HUD during gameplay
+        self.pause_btn = pygame.Rect(WIDTH - 140, 10, 130, 35)
+
+        # Pause UI Audio
+        self.snd_ui = pygame.mixer.Sound("resources/audio/ui_click.wav")
+        self.snd_ui.set_volume(0.6)
+
+        # End Screen
+        self.end_screen = EndScreen(self.screen, self.font)
+
+        # Scene 1 setup
         self.current_scene = "scene_1"
         self.scene1 = Scene1Manager(self)
 
@@ -159,9 +206,60 @@ class Game:
         if progress >= 1.0:
             self.moon_transition_duration = 0
 
+    def _update_lightning(self, now):
+        if self.lightning_state == "idle":
+            if now >= self.lightning_state_timer:
+                self.lightning_remaining_flashes = random.randint(1, 3)
+                self.lightning_state = "sky_flash"
+                self.lightning_state_timer = now + 120
+                self.lightning_sky_intensity = 1.0
+        elif self.lightning_state == "sky_flash":
+            remaining = self.lightning_state_timer - now
+            if remaining <= 0:
+                self.lightning_sky_intensity = 0.0
+                self.lightning_cloud_delay = random.randint(0, 1000)
+                self.lightning_state = "cloud_wait"
+                self.lightning_state_timer = now + self.lightning_cloud_delay
+            else:
+                self.lightning_sky_intensity = min(remaining / 120.0, 1.0)
+        elif self.lightning_state == "cloud_wait":
+            if now >= self.lightning_state_timer:
+                self.lightning_clouds_intensity = 1.0
+                self.lightning_state = "cloud_flash"
+                self.lightning_state_timer = now + 120
+        elif self.lightning_state == "cloud_flash":
+            remaining = self.lightning_state_timer - now
+            if remaining <= 0:
+                self.lightning_clouds_intensity = 0.0
+                self.lightning_remaining_flashes -= 1
+                if self.lightning_remaining_flashes > 0:
+                    self.lightning_state = "sky_flash"
+                    self.lightning_sky_intensity = 1.0
+                    self.lightning_state_timer = now + 120
+                else:
+                    self.lightning_state = "idle"
+                    self.lightning_state_timer = now + random.randint(3000, 8000)
+            else:
+                self.lightning_clouds_intensity = min(remaining / 120.0, 1.0)
+
+        # Apply flash to sky surface
+        if self.lightning_sky_intensity > 0:
+            self.bg_sky = self.bg_sky_original.copy()
+            c = int(255 * self.lightning_sky_intensity)
+            self.bg_sky.fill((c, c, c), None, pygame.BLEND_RGB_ADD)
+        else:
+            self.bg_sky = self.bg_sky_original
+
+        # Apply flash to clouds surface
+        if self.lightning_clouds_intensity > 0:
+            self.bg_clouds = self.bg_clouds_original.copy()
+            c = int(255 * self.lightning_clouds_intensity)
+            self.bg_clouds.fill((c, c, c), None, pygame.BLEND_RGB_ADD)
+        else:
+            self.bg_clouds = self.bg_clouds_original
+
     # Ground detection
     def is_on_ground(self, px, py):
-        # Clamps coordinates when checking ground off-screen horizontally
         clamped_x = max(0, min(WIDTH - 1, px))
         if 0 <= py < HEIGHT:
             return self.bg_ground.get_at((int(clamped_x), int(py))).a > 0
@@ -176,18 +274,27 @@ class Game:
 
     def reset_for_combat(self):
         """Resets variables back to combat defaults."""
-        player_anims = load_player_anims()
-        rage_anims = load_rage_anims()
-        enemy_normal, enemy_wounded = load_enemy_anims()
+        player_normal, player_wounded = load_player_anims()
+        rage_normal, rage_wounded = load_rage_anims()
+        enemy_normal, wounded_shoot, wounded_scar = load_enemy_anims()
         partner_anims = load_partner_anims()
 
-        self.player = Player(player_anims, rage_anims)
-        self.enemy = Enemy(enemy_normal, enemy_wounded)
+        self.player = Player(
+            player_normal,
+            player_wounded,
+            rage_normal,
+            rage_wounded
+        )
+        self.enemy = Enemy(
+            enemy_normal,
+            wounded_shoot,
+            wounded_scar
+        )
         self.partner = Partner(partner_anims)
         self.bullets = BulletManager()
         self.timeline = TimelineManager(self)
 
-        # Relocate the civic to y 490 in the combat scene
+        # Relocate the civic to y 490 in the next scene
         self.civic_x = self.partner.x + 60
         self.civic_y = 490
         
@@ -201,6 +308,10 @@ class Game:
         self.enemy.attack_timer = self.start_time
         self.enemy.regen_timer = self.start_time
         self.partner.last_shot = self.start_time
+
+        # Reset partner death tracker
+        self.partner_death_handled = False
+        self.partner_death_time = 0
 
         self.ending_triggered = False
         self.can_kill = False
@@ -242,7 +353,7 @@ class Game:
         if p.action != "attack":
             return
         attack_rect = p.get_attack_rect()
-        if DEBUG:
+        if self.debug_enabled:
             pygame.draw.rect(self.screen, (255, 0, 0), attack_rect, 2)
         if not attack_rect.colliderect(e.rect) or p.attack_has_hit:
             return
@@ -277,25 +388,68 @@ class Game:
             if keys[pygame.K_a] or keys[pygame.K_d]:
                 moving = True
 
+        mute_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 - 100, 300, 50)
+        debug_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 + 80, 300, 50)
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                return False
-            if allow_input:
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1:
-                        if DEBUG and self.moon_btn_rect.collidepoint(event.pos):
-                            self.moon_is_red = not self.moon_is_red
-                            self.moon_red(self.moon_is_red, 1000)
+                pygame.quit()
+                sys.exit()
+
+            # Handle Esc Key for Pausing
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    if not self.paused:
+                        self.paused = True
+                        self.pause_start_time = pygame.time.get_ticks()
+                    else:
+                        self.paused = False
+                        self.total_paused_time += (pygame.time.get_ticks() - self.pause_start_time)
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                if self.paused:
+                    if self.resume_btn.collidepoint(mouse_pos):
+                        self.paused = False
+                        self.total_paused_time += (pygame.time.get_ticks() - self.pause_start_time)
+                    elif self.menu_btn.collidepoint(mouse_pos):
+                        self.snd_ui.play()
+                        self.return_to_menu = True
+                    elif mute_btn.collidepoint(mouse_pos):
+                        self.muted = not self.muted
+                        self.snd_ui.play()
+                        if self.muted:
+                            pygame.mixer.music.set_volume(0.0)
+                            self.snd_ui.set_volume(0.0)
+                            self.player.mute()
+                            self.partner.mute()
                         else:
-                            self.player.handle_shoot(self.bullets, moving)
-                    if event.button == 3:
-                        self.player.handle_attack()
+                            pygame.mixer.music.set_volume(0.5)
+                            self.snd_ui.set_volume(0.6)
+                            self.player.unmute()
+                            self.partner.unmute()
+                    elif debug_btn.collidepoint(mouse_pos):
+                        self.debug_enabled = not self.debug_enabled
+                        self.snd_ui.play()
+                else:
+                    if self.pause_btn.collidepoint(mouse_pos):
+                        self.paused = True
+                        self.pause_start_time = pygame.time.get_ticks()
+                    elif allow_input:
+                        if event.button == 1:
+                            if self.debug_enabled and self.moon_btn_rect.collidepoint(event.pos):
+                                self.moon_is_red = not self.moon_is_red
+                                self.moon_red(self.moon_is_red, 1000)
+                            else:
+                                self.player.handle_shoot(self.bullets, moving)
+                        if event.button == 3:
+                            self.player.handle_attack()
         return True
 
     def update(self, now):
         if self.current_scene == "scene_1":
             self.scene1.update(now)
-            # Standard gravity and animation simulation during non-combat phases
+            # Apply normal physics and animation ticks during intro timeline phases
             if self.scene1.phase != "combat":
                 self.player.update_gravity(self.is_on_ground)
                 self.partner.update_gravity(self.is_on_ground)
@@ -306,6 +460,7 @@ class Game:
                 return
 
         # General calculations loop
+        self._update_lightning(now)
         self._update_moon_transition(now)
         keys = pygame.key.get_pressed()
         self.player.handle_movement(keys)
@@ -313,7 +468,6 @@ class Game:
         self.player.update_leap(self.enemy.rect)
         self.player.update_gravity(self.is_on_ground)
         self.player.clamp_to_screen()
-        self.player.update_recharge(now)
         self.player.update_regen(now)
 
         # Player bullets
@@ -330,18 +484,17 @@ class Game:
         self.enemy.update_auto_attack(now)
         self.civic_x, self.civic_y, self.target_partner, self.civic_hit = \
             self.enemy.update_march(
-                now, self.partner.x, self.partner.y, self.partner.dead,
+                now, self.player.x, self.partner.x, self.partner.y, self.partner.dead,
                 self.civic_x, self.civic_y, self.target_partner, self.civic_hit,
                 self.player.scale,
             )
 
-        # Escape logic
+        # Enemy escape end
         if self.enemy.escape and self.enemy.x < -200:
-            if self.current_scene == "combat":
-                self.game_end = True
-                self.game_result = "ENEMY ESCAPED"
+            self.game_end = True
+            self.game_result = "ENEMY ESCAPED"
 
-        # Damage execution
+        # Enemy damage
         self.enemy.damage_player(self.player, now)
         if self.target_partner:
             self.enemy.damage_partner(self.partner, now)
@@ -354,7 +507,20 @@ class Game:
             if not self.enemy.dead:
                 self.enemy.hurt_from_damage()
 
+        # Partner death → 2s pause → back to player chase
+        if self.partner.dead and not self.partner_death_handled:
+            self.partner_death_handled = True
+            self.partner_death_time = now
+
+        if self.partner.dead and self.partner_death_handled \
+                and now - self.partner_death_time >= PARTNER_DEATH_PAUSE \
+                and self.target_partner:
+            self.target_partner = False
+            self.enemy.phase = 0
+
         # Animations
+        self.enemy.update_wounded_sprite(self.player.rage_mode)
+        self.player.update_wounded_sprite()
         self.player.update_animation()
         self.enemy.update_animation()
         self.partner.update_animation()
@@ -371,21 +537,39 @@ class Game:
         self.player.draw(self.screen)
         self.bullets.draw_player_bullets(self.screen)
 
-        # Only draw the civic vehicle if outside of Scene 1
+        # Hide the civic vehicle during Scene 1
         if self.current_scene != "scene_1":
             self.screen.blit(self.civic_img, (self.civic_x, self.civic_y))
 
         self.partner.draw(self.screen)
         self.bullets.draw_partner_bullets(self.screen)
 
-        if DEBUG:
+        if self.debug_enabled:
             self.draw_debug_grid()
             self.draw_debug_ui(now)
             self.draw_debug_rects()
         else:
             self.draw_ui(now)
 
-        # Overlay rendering
+        # Draw pause button on HUD during gameplay
+        if not self.paused and not self.game_end:
+            pygame.draw.rect(self.screen, (60, 60, 60), self.pause_btn)
+            pygame.draw.rect(self.screen, (200, 200, 200), self.pause_btn, 2)
+            pause_label = self.font.render("PAUSE", True, (255, 255, 255))
+            self.screen.blit(pause_label, pause_label.get_rect(center=self.pause_btn.center))
+
+        # Draw the pause menu
+        if self.paused:
+            self.draw_pause_menu()
+
+        if self.debug_enabled:
+            btn_color = (255, 100, 100) if self.moon_is_red else (200, 200, 200)
+            pygame.draw.rect(self.screen, btn_color, self.moon_btn_rect)
+            pygame.draw.rect(self.screen, (255, 255, 255), self.moon_btn_rect, 2)
+            self.screen.blit(self.debug_font.render("Test moon switch 1s", True, (0, 0, 0)),
+                   (self.moon_btn_rect.x + 6, self.moon_btn_rect.y + 8))
+
+        # Fade transitions overlay
         if self.current_scene == "scene_1" and self.scene1.fade_alpha > 0:
             self.scene1.draw_fade(self.screen)
 
@@ -393,20 +577,8 @@ class Game:
 
     def draw_ui(self, now):
         p = self.player
-        e = self.enemy
         s = self.screen
         f = self.font
-
-        s.blit(f.render(f"Shots: {p.shots}/{12}", True, (255, 255, 255)), (20, 20))
-        s.blit(f.render(f"Action: {p.action}", True, (255, 255, 0)), (20, 60))
-        s.blit(f.render(f"Enemy: {e.action}", True, (255, 100, 100)), (20, 100))
-        s.blit(f.render(f"Player HP: {int(p.hp)}", True, (100, 255, 100)), (20, 140))
-        s.blit(f.render(f"Enemy HP: {e.hp:.1f}", True, (255, 100, 100)), (20, 180))
-
-        if now - self.start_time >= ENDING_TIME:
-            s.blit(f.render(f"Can Kill: {bool(self.can_kill)}", True, (255, 100, 100)), (20, 240))
-
-        s.blit(f.render(f"Time: {int(now)}", True, (255, 100, 100)), (20, 280))
 
         if p.rage_mode:
             s.blit(f.render("RAGE MODE", True, (255, 40, 40)), (20, 220))
@@ -437,13 +609,6 @@ class Game:
 
         if self.game_end:
             s.blit(f.render(self.game_result, True, (255, 50, 50)), (WIDTH // 2, HEIGHT // 2))
-
-        # Debug moon toggle button (top-right)
-        btn_color = (255, 100, 100) if self.moon_is_red else (200, 200, 200)
-        pygame.draw.rect(s, btn_color, self.moon_btn_rect)
-        pygame.draw.rect(s, (255, 255, 255), self.moon_btn_rect, 2)
-        s.blit(self.debug_font.render("Test moon switch 1s", True, (0, 0, 0)),
-               (self.moon_btn_rect.x + 6, self.moon_btn_rect.y + 8))
 
     def draw_debug_grid(self):
         surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -526,20 +691,76 @@ class Game:
             ), (WIDTH - 450, info_y))
             info_y += 22
 
+    def draw_pause_menu(self):
+        # Draw dark overlay
+        overlay = pygame.Surface((WIDTH, HEIGHT))
+        overlay.set_alpha(150)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+
+        # Title
+        title_surf = self.font.render("PAUSED", True, (255, 255, 255))
+        title_rect = title_surf.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 180))
+        self.screen.blit(title_surf, title_rect)
+
+        mouse_pos = pygame.mouse.get_pos()
+
+        mute_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 - 100, 300, 50)
+        debug_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 + 80, 300, 50)
+
+        # Mute / Unmute Button
+        mute_text = "UNMUTE" if self.muted else "MUTE"
+        mute_color = (200, 200, 200) if not mute_btn.collidepoint(mouse_pos) else (255, 255, 255)
+        mute_surf = self.font.render(mute_text, True, mute_color)
+        self.screen.blit(mute_surf, mute_surf.get_rect(center=mute_btn.center))
+
+        # Resume Button
+        res_color = (255, 255, 255) if self.resume_btn.collidepoint(mouse_pos) else (200, 200, 200)
+        res_surf = self.font.render("RESUME", True, res_color)
+        self.screen.blit(res_surf, res_surf.get_rect(center=self.resume_btn.center))
+
+        # Main Menu Button
+        menu_color = (255, 50, 50) if self.menu_btn.collidepoint(mouse_pos) else (200, 50, 50)
+        menu_surf = self.font.render("MAIN MENU", True, menu_color)
+        self.screen.blit(menu_surf, menu_surf.get_rect(center=self.menu_btn.center))
+
+        # Debug Toggle Button
+        debug_text = f"DEBUG: {'ON' if self.debug_enabled else 'OFF'}"
+        debug_color = (200, 200, 200) if not debug_btn.collidepoint(mouse_pos) else (255, 255, 255)
+        debug_surf = self.font.render(debug_text, True, debug_color)
+        self.screen.blit(debug_surf, debug_surf.get_rect(center=debug_btn.center))
+
     def run(self):
         running = True
         while running:
             self.clock.tick(FPS)
-            now = pygame.time.get_ticks()
+            raw_now = pygame.time.get_ticks()
 
-            if not self.update_endings(now):
-                break
+            self.handle_events()
 
-            if not self.handle_events():
-                break
+            # Return to main.py menu on request
+            if self.return_to_menu:
+                pygame.mixer.music.stop()
+                return
 
-            self.update(now)
-            self.draw(now)
+            # Subtract total paused duration
+            frozen_now = raw_now - self.total_paused_time
 
-        pygame.quit()
-        sys.exit()
+            # Handle character updates when unpaused
+            if not self.paused:
+                if not self.update_endings(frozen_now):
+                    break
+                self.update(frozen_now)
+
+            self.draw(frozen_now)
+
+            # End game intercept
+            if self.game_end:
+                pygame.mixer.music.stop()
+
+                result_type = "victory" if "EXECUTED" in self.game_result else "defeat"
+                choice = self.end_screen.run(result_type)
+                return choice
+
+        pygame.mixer.music.stop()
+        return "main_menu"

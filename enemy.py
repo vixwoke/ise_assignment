@@ -11,7 +11,7 @@ from config import (
 
 
 class Enemy:
-    def __init__(self, normal_anims, wounded_anims):
+    def __init__(self, normal_anims, wounded_shoot_anims, wounded_scar_anims):
         self.x = WIDTH // 2 + ENEMY_CHAR_OFFSET_X
         self.y = HEIGHT // 2 + ENEMY_CHAR_OFFSET_Y
         self.facing_right = True
@@ -22,7 +22,8 @@ class Enemy:
         self.wounded = False
 
         self.normal_anims = normal_anims
-        self.wounded_anims = wounded_anims
+        self.wounded_shoot_anims = wounded_shoot_anims
+        self.wounded_scar_anims = wounded_scar_anims
         self.anims = dict(normal_anims)
 
         self.action = "idle"
@@ -37,7 +38,11 @@ class Enemy:
         self.locked = False
         self.escape = False
 
-        # Gravity
+        self.waiting_after_civic = False
+
+        # Phase control
+        self.phase = 0  # 0 = civic, 1 = partner
+
         self.fall_speed = 0
         self.on_ground = False
 
@@ -50,12 +55,17 @@ class Enemy:
             self.action = action
             self.animation = frames
             self.frame_index = 0.0
+            self.has_hit_partner = False
 
     def make_wounded(self):
         if self.wounded:
             return
+
         self.wounded = True
-        self.anims = dict(self.wounded_anims)
+
+        # Default wounded sprite before rage
+        self.anims = dict(self.wounded_shoot_anims)
+
         self.animation = self.anims["hurt"]
         self.frame_index = 0.0
 
@@ -68,6 +78,17 @@ class Enemy:
         self.animation = self.anims["idle"]
         self.frame_index = 0.0
 
+    def update_wounded_sprite(self, rage_mode):
+        if not self.wounded:
+            return
+
+        if rage_mode:
+            self.anims = dict(self.wounded_scar_anims)
+        else:
+            self.anims = dict(self.wounded_shoot_anims)
+
+        self.animation = self.anims[self.action]
+
     def hurt_from_damage(self):
         self.hp -= 1
         if self.hp < 1:
@@ -76,7 +97,6 @@ class Enemy:
             self.make_wounded()
         self.set_animation("hurt", self.anims["hurt"])
 
-    # Gravity
     def update_gravity(self, is_on_ground_fn, scale):
         self.fall_speed += GRAVITY
         self.y += self.fall_speed
@@ -93,17 +113,17 @@ class Enemy:
         else:
             self.on_ground = False
 
-    def update_auto_attack(self, now):
-        if self.dead or self.march or self.locked:
-            return
-        if self.action != "attack" and now - self.attack_timer >= ENEMY_ATTACK_INTERVAL:
-            self.attack_timer = now
-            self.set_animation("attack", self.anims["attack"])
-
-    def update_march(self, now, partner_x, partner_y, partner_dead,
+    def update_march(self, now, player_x, partner_x, partner_y, partner_dead,
                      civic_x, civic_y, target_partner, civic_hit, scale):
+
         if not self.march or self.dead or self.locked:
             return civic_x, civic_y, target_partner, civic_hit
+
+        # Switch phase after civic hit
+        if self.waiting_after_civic:
+            self.phase = 1
+            target_partner = True
+            self.waiting_after_civic = False
 
         # Escape
         if self.escape:
@@ -112,51 +132,41 @@ class Enemy:
             self.facing_right = False
             return civic_x, civic_y, target_partner, civic_hit
 
-        # Partner dead: idle attack (regardless of target_partner)
-        if partner_dead:
+        # Partner dead - continue attacking on a timer
+        if partner_dead and target_partner:
             if now - self.attack_timer >= ENEMY_ATTACK_INTERVAL:
                 self.attack_timer = now
                 self.set_animation("attack", self.anims["attack"])
                 self.has_hit_partner = False
             return civic_x, civic_y, target_partner, civic_hit
 
-        # Choose target
-        if target_partner and not partner_dead:
-            tx = partner_x + 30
-            ty = partner_y - 20
+        # Targeting
+        if partner_dead:
+            tx = player_x
+        elif self.phase == 1:
+            tx = partner_x
         else:
-            tx = civic_x + 20
-            ty = civic_y - 50
+            tx = civic_x
 
         dx = tx - self.x
-        dy = ty - self.y
-        distance = math.sqrt(dx * dx + dy * dy)
+        distance = abs(dx)
 
-        if distance > 5:
-            move_x = (dx / distance) * ENEMY_SPEED
-            move_y = (dy / distance) * ENEMY_SPEED
-            self.x += move_x
-            self.y += move_y
+        # Move on X axis only
+        if distance > 60:
+            self.x += ENEMY_SPEED if dx > 0 else -ENEMY_SPEED
             self.action = "walk"
             self.animation = self.anims["walk"]
-            self.facing_right = move_x > 0
+            self.facing_right = dx > 0
         else:
-            # At target
-            if target_partner and not partner_dead:
-                if self.action != "attack":
-                    self.set_animation("attack", self.anims["attack"])
-                    self.has_hit_partner = False
-            else:
-                if now - self.attack_timer >= ENEMY_ATTACK_INTERVAL:
-                    self.attack_timer = now
-                    self.set_animation("attack", self.anims["attack"])
+            if self.action != "attack":
+                self.set_animation("attack", self.anims["attack"])
 
-                current_frame = int(self.frame_index)
-                if current_frame == 4 and not civic_hit:
-                    civic_x += 100
-                    civic_y -= 100
-                    civic_hit = True
-                    target_partner = True
+            current_frame = int(self.frame_index)
+            if current_frame == 4 and not civic_hit:
+                civic_x += 100
+                civic_y += 100
+                civic_hit = True
+                self.waiting_after_civic = True
 
         return civic_x, civic_y, target_partner, civic_hit
 
@@ -168,9 +178,9 @@ class Enemy:
             return
 
         if self.facing_right:
-            attack_rect = pygame.Rect(self.x + 20, self.y - 20, 20, 50)
+            attack_rect = pygame.Rect(self.x + 40, self.y - 20, 30, 50)
         else:
-            attack_rect = pygame.Rect(self.x - 70, self.y - 20, 30, 50)
+            attack_rect = pygame.Rect(self.x - 40, self.y - 20, 30, 50)
 
         if attack_rect.colliderect(player.rect):
             player.take_damage(ENEMY_ATTACK_DAMAGE, now)
@@ -178,20 +188,30 @@ class Enemy:
     def damage_partner(self, partner, now):
         if not partner or partner.dead:
             return
+
         frame = int(self.frame_index)
         partner_rect = pygame.Rect(partner.x + 35, partner.y + 30, 90, 70)
 
         if self.action == "attack" and frame == 4 and not self.has_hit_partner:
-            attack_rect = pygame.Rect(self.x + 20, self.y - 20, 20, 40)
+            attack_rect = pygame.Rect(self.x + 20, self.y - 20, 60, 70)
+
             if attack_rect.colliderect(partner_rect):
                 partner.hp -= ENEMY_PARTNER_DAMAGE
                 self.has_hit_partner = True
+
                 if partner.hp > 0:
                     partner.set_animation("hurt", partner.anims["hurt"])
                 else:
                     partner.hp = 0
                     partner.dead = True
                     partner.set_animation("dead", partner.anims["dead"])
+
+    def update_auto_attack(self, now):
+        if self.dead or self.march or self.locked:
+            return
+        if self.action != "attack" and now - self.attack_timer >= ENEMY_ATTACK_INTERVAL:
+            self.attack_timer = now
+            self.set_animation("attack", self.anims["attack"])
 
     def update_regen(self, now):
         if now - self.regen_timer >= ENEMY_REGEN_INTERVAL:
@@ -212,10 +232,9 @@ class Enemy:
                 self.animation = self.anims["idle"]
                 self.frame_index = 0.0
             elif self.action == "hurt":
-                if not self.dead:
-                    self.action = "idle"
-                    self.animation = self.anims["idle"]
-                    self.frame_index = 0.0
+                self.action = "idle"
+                self.animation = self.anims["idle"]
+                self.frame_index = 0.0
             elif self.action == "dead":
                 self.frame_index = len(self.animation) - 1
             else:
@@ -225,10 +244,16 @@ class Enemy:
         frame = self.animation[int(self.frame_index)]
         if not self.facing_right:
             frame = pygame.transform.flip(frame, True, False)
+
         frame = pygame.transform.scale(
             frame,
             (int(FRAME_W * scale), int(FRAME_H * scale)),
         )
-        frame_x = self.x - ENEMY_CHAR_OFFSET_X * scale
-        frame_y = self.y - ENEMY_CHAR_OFFSET_Y * scale
-        screen.blit(frame, (frame_x, frame_y))
+
+        screen.blit(
+            frame,
+            (
+                self.x - ENEMY_CHAR_OFFSET_X * scale,
+                self.y - ENEMY_CHAR_OFFSET_Y * scale
+            )
+        )

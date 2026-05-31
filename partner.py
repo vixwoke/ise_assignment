@@ -10,7 +10,7 @@ from config import (
 class Partner:
     def __init__(self, anims):
         self.x = 30
-        self.y = HEIGHT - 180
+        self.y = HEIGHT // 1.9
         self.hp = PARTNER_HP
         self.dead = False
 
@@ -20,6 +20,11 @@ class Partner:
         self.frame_index = 0.0
 
         self.last_shot = 0
+
+        # Partner Audio
+        self.snd_shotgun = pygame.mixer.Sound("resources/audio/shotgun.wav")
+        self.snd_shotgun.set_volume(0.4)
+        self._shotgun_vol = 0.4
 
         # Gravity & Physics properties
         self.fall_speed = 0
@@ -35,6 +40,12 @@ class Partner:
             int(PLAYER_CHAR_HITBOX_H * self.scale),
         )
 
+    def mute(self):
+        self.snd_shotgun.set_volume(0)
+
+    def unmute(self):
+        self.snd_shotgun.set_volume(self._shotgun_vol)
+
     def set_animation(self, action, frames):
         if self.action != action:
             self.action = action
@@ -48,6 +59,7 @@ class Partner:
             return
 
         self.last_shot = now
+        self.snd_shotgun.play()
         self.set_animation("shoot", self.anims["shoot"])
         bullet_manager.add_partner_bullets(
             self.x + 90, self.y + 70,
