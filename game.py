@@ -99,6 +99,20 @@ class Game:
         self.kill = False
         self.game_end = False
         self.game_result = ""
+        # Pause Functionality
+        self.paused = False
+        self.pause_start_time = 0
+        self.total_paused_time = 0
+        self.return_to_menu = False
+        self.muted = False
+        self.debug_enabled = DEBUG
+        self.resume_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 - 40, 300, 50)
+        self.menu_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 + 20, 300, 50)
+        # Pause button on HUD during gameplay
+        self.pause_btn = pygame.Rect(WIDTH - 140, 10, 130, 35)
+        # Pause UI Audio
+        self.snd_ui = pygame.mixer.Sound("resources/audio/ui_click.wav")
+        self.snd_ui.set_volume(0.6)
 
     @staticmethod
     def _load_bg(path, fallback_color=None, alpha=False):
@@ -169,7 +183,7 @@ class Game:
         if p.action != "attack":
             return
         attack_rect = p.get_attack_rect()
-        if DEBUG:
+        if self.debug_enabled:
             pygame.draw.rect(self.screen, (255, 0, 0), attack_rect, 2)
         if not attack_rect.colliderect(e.rect) or p.attack_has_hit:
             return
@@ -199,14 +213,55 @@ class Game:
         if self.player.can_walk():
             if keys[pygame.K_a] or keys[pygame.K_d]:
                 moving = True
+
+        mute_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 - 100, 300, 50)
+        debug_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 + 80, 300, 50)
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                return False
+                pygame.quit()
+                sys.exit()
+
+            # Handle Esc Key for Pausing
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    if not self.paused:
+                        self.paused = True
+                        self.pause_start_time = pygame.time.get_ticks()
+                    else:
+                        self.paused = False
+                        self.total_paused_time += (pygame.time.get_ticks() - self.pause_start_time)
+
             if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
-                        self.player.handle_shoot(self.bullets, moving)
-                if event.button == 3:
-                    self.player.handle_attack()
+                mouse_pos = pygame.mouse.get_pos()
+                if self.paused:
+                    if self.resume_btn.collidepoint(mouse_pos):
+                        self.paused = False
+                        self.total_paused_time += (pygame.time.get_ticks() - self.pause_start_time)
+                    elif self.menu_btn.collidepoint(mouse_pos):
+                        self.snd_ui.play()
+                        self.return_to_menu = True
+                    elif mute_btn.collidepoint(mouse_pos):
+                        self.muted = not self.muted
+                        self.snd_ui.play()
+                        if self.muted:
+                            pygame.mixer.music.set_volume(0.0)
+                            self.snd_ui.set_volume(0.0)
+                        else:
+                            pygame.mixer.music.set_volume(0.5)
+                            self.snd_ui.set_volume(0.6)
+                    elif debug_btn.collidepoint(mouse_pos):
+                        self.debug_enabled = not self.debug_enabled
+                        self.snd_ui.play()
+                else:
+                    if self.pause_btn.collidepoint(mouse_pos):
+                        self.paused = True
+                        self.pause_start_time = pygame.time.get_ticks()
+                    else:
+                        if event.button == 1:
+                            self.player.handle_shoot(self.bullets, moving)
+                        if event.button == 3:
+                            self.player.handle_attack()
         return True
 
     def update(self, now):
@@ -285,13 +340,23 @@ class Game:
         self.partner.draw(self.screen)
         self.bullets.draw_partner_bullets(self.screen)
 
-        if DEBUG:
+        if self.debug_enabled:
             self.draw_debug_grid()
             self.draw_debug_ui(now)
             self.draw_debug_rects()
         else:
             self.draw_ui(now)
 
+        # Draw pause button on HUD during gameplay
+        if not self.paused and not self.game_end:
+            pygame.draw.rect(self.screen, (60, 60, 60), self.pause_btn)
+            pygame.draw.rect(self.screen, (200, 200, 200), self.pause_btn, 2)
+            pause_label = self.font.render("PAUSE", True, (255, 255, 255))
+            self.screen.blit(pause_label, pause_label.get_rect(center=self.pause_btn.center))
+
+        # Draw the pause menu
+        if self.paused:
+            self.draw_pause_menu()
         pygame.display.flip()
 
     def draw_ui(self, now):
@@ -408,20 +473,77 @@ class Game:
             ), (WIDTH - 450, info_y))
             info_y += 22
 
+    def draw_pause_menu(self):
+        # Draw dark overlay
+        overlay = pygame.Surface((WIDTH, HEIGHT))
+        overlay.set_alpha(150)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+
+        # Title
+        title_surf = self.font.render("PAUSED", True, (255, 255, 255))
+        title_rect = title_surf.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 180))
+        self.screen.blit(title_surf, title_rect)
+
+        mouse_pos = pygame.mouse.get_pos()
+
+        mute_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 - 100, 300, 50)
+        debug_btn = pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 + 80, 300, 50)
+
+        # Mute / Unmute Button
+        mute_text = "UNMUTE" if self.muted else "MUTE"
+        mute_color = (200, 200, 200) if not mute_btn.collidepoint(mouse_pos) else (255, 255, 255)
+        mute_surf = self.font.render(mute_text, True, mute_color)
+        self.screen.blit(mute_surf, mute_surf.get_rect(center=mute_btn.center))
+
+        # Resume Button
+        res_color = (255, 255, 255) if self.resume_btn.collidepoint(mouse_pos) else (200, 200, 200)
+        res_surf = self.font.render("RESUME", True, res_color)
+        self.screen.blit(res_surf, res_surf.get_rect(center=self.resume_btn.center))
+
+        # Main Menu Button
+        menu_color = (255, 50, 50) if self.menu_btn.collidepoint(mouse_pos) else (200, 50, 50)
+        menu_surf = self.font.render("MAIN MENU", True, menu_color)
+        self.screen.blit(menu_surf, menu_surf.get_rect(center=self.menu_btn.center))
+
+        # Debug Toggle Button
+        debug_text = f"DEBUG: {'ON' if self.debug_enabled else 'OFF'}"
+        debug_color = (200, 200, 200) if not debug_btn.collidepoint(mouse_pos) else (255, 255, 255)
+        debug_surf = self.font.render(debug_text, True, debug_color)
+        self.screen.blit(debug_surf, debug_surf.get_rect(center=debug_btn.center))
+
+
+
     def run(self):
         running = True
         while running:
             self.clock.tick(FPS)
-            now = pygame.time.get_ticks()
+            raw_now = pygame.time.get_ticks()
 
-            if not self.update_endings(now):
-                break
+            self.handle_events()
 
-            if not self.handle_events():
-                break
+            # Break the loop and return to main.py if player clicked MAIN MENU
+            if self.return_to_menu:
+                pygame.mixer.music.stop()
+                return
 
-            self.update(now)
-            self.draw(now)
+                # Calculate frozen time
+            frozen_now = raw_now - self.total_paused_time
+
+            # Only update characters and endings if the game is NOT paused
+            if not self.paused:
+                if not self.update_endings(frozen_now):
+                    break
+                self.update(frozen_now)
+
+            # Always draw the background game
+            self.draw(frozen_now)
+
+
+
+        # If the game naturally ends (death/escape) stop music and return to menu
+        pygame.mixer.music.stop()
+        return
 
         pygame.quit()
         sys.exit()

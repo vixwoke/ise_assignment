@@ -18,6 +18,9 @@ class Partner:
         self.frame_index = 0.0
 
         self.last_shot = 0
+        # Partner Audio
+        self.snd_shotgun = pygame.mixer.Sound("resources/audio/shotgun.wav")
+        self.snd_shotgun.set_volume(0.4)
 
     def set_animation(self, action, frames):
         if self.action != action:
@@ -32,6 +35,7 @@ class Partner:
             return
 
         self.last_shot = now
+        self.snd_shotgun.play()
         self.set_animation("shoot", self.anims["shoot"])
         bullet_manager.add_partner_bullets(
             self.x + 90, self.y + 70,

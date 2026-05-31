@@ -99,7 +99,7 @@ BG_MOON_PATH = "resources/image/elements/moon.png"
 BG_CLOUDS_PATH = "resources/image/background/night-grass-clouds.png"
 BG_ROCKS_PATH = "resources/image/background/night-grass-rocks.png"
 BG_GROUND_PATH = "resources/image/background/night-grass-ground.png"
-
+BG_MENU_PATH = "resources/image/background/menu_bg.png"
 # Moon position
 MOON_X = 700
 MOON_Y = 100
