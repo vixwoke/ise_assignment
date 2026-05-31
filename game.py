@@ -356,9 +356,11 @@ class Game:
                     if not self.paused:
                         self.paused = True
                         self.pause_start_time = pygame.time.get_ticks()
+                        pygame.mixer.music.pause()
                     else:
                         self.paused = False
                         self.total_paused_time += (pygame.time.get_ticks() - self.pause_start_time)
+                        pygame.mixer.music.unpause()
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
@@ -366,6 +368,7 @@ class Game:
                     if self.resume_btn.collidepoint(mouse_pos):
                         self.paused = False
                         self.total_paused_time += (pygame.time.get_ticks() - self.pause_start_time)
+                        pygame.mixer.music.unpause()
                     elif self.menu_btn.collidepoint(mouse_pos):
                         self.snd_ui.play()
                         self.return_to_menu = True
@@ -389,6 +392,7 @@ class Game:
                     if self.pause_btn.collidepoint(mouse_pos):
                         self.paused = True
                         self.pause_start_time = pygame.time.get_ticks()
+                        pygame.mixer.music.pause()
                     else:
                         if event.button == 1:
                             if self.debug_enabled and self.moon_btn_rect.collidepoint(event.pos):
