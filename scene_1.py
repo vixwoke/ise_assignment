@@ -32,6 +32,7 @@ class Scene1Manager:
             if now - self.combat_start_time >= 30000:
                 self.phase = "enemy_escape"
                 self.phase_timer = now
+                self.game.enemy.march = False
 
         if self.phase == "intro_walk":
             target_player_x = WIDTH // 4 + PLAYER_CHAR_OFFSET_X
@@ -93,6 +94,7 @@ class Scene1Manager:
             if now - self.phase_timer >= 3000:
                 self.phase = "combat"
                 self.combat_start_time = now
+                self.game.enemy.march = True
 
         elif self.phase == "combat":
             pass

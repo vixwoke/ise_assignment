@@ -114,7 +114,7 @@ class Enemy:
             self.on_ground = False
 
     def update_march(self, now, player_x, partner_x, partner_y, partner_dead,
-                     civic_x, civic_y, target_partner, civic_hit, scale):
+                     civic_x, civic_y, target_partner, civic_hit, scale, is_scene_1=False):
 
         if not self.march or self.dead or self.locked:
             return civic_x, civic_y, target_partner, civic_hit
@@ -141,7 +141,9 @@ class Enemy:
             return civic_x, civic_y, target_partner, civic_hit
 
         # Targeting
-        if partner_dead:
+        if is_scene_1:
+            tx = player_x
+        elif partner_dead:
             tx = player_x
         elif self.phase == 1:
             tx = partner_x
@@ -162,7 +164,7 @@ class Enemy:
                 self.set_animation("attack", self.anims["attack"])
 
             current_frame = int(self.frame_index)
-            if current_frame == 4 and not civic_hit:
+            if current_frame == 4 and not civic_hit and not is_scene_1:
                 civic_x += 100
                 civic_y += 100
                 civic_hit = True

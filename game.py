@@ -482,11 +482,15 @@ class Game:
         # Enemy AI
         self.enemy.update_gravity(self.is_on_ground, self.player.scale)
         self.enemy.update_auto_attack(now)
+        
+        is_scene_1 = (self.current_scene == "scene_1")
+        
         self.civic_x, self.civic_y, self.target_partner, self.civic_hit = \
             self.enemy.update_march(
                 now, self.player.x, self.partner.x, self.partner.y, self.partner.dead,
                 self.civic_x, self.civic_y, self.target_partner, self.civic_hit,
                 self.player.scale,
+                is_scene_1
             )
 
         # Enemy escape end
