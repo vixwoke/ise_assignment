@@ -3,7 +3,7 @@ import random
 from config import (
     WIDTH, HEIGHT, FRAME_W, FRAME_H, PLAYER_SPEED, PLAYER_HP, PLAYER_MAX_HP,
     PLAYER_HIT_COOLDOWN, PLAYER_REGEN_INTERVAL, PLAYER_REGEN_AMOUNT,
-    PLAYER_RAGE_REGEN_AMOUNT, MAX_SHOTS, RECHARGE_TIME,
+    PLAYER_RAGE_REGEN_AMOUNT, MAX_SHOTS,
     LEAP_SPEED, NORMAL_ANIM_SPEED, JUMP_ANIM_SPEED, RAGE_SCALE, DEFAULT_SCALE,
     GRAVITY, JUMP_FORCE,
     PLAYER_CHAR_OFFSET_X, PLAYER_CHAR_OFFSET_Y,
@@ -44,7 +44,6 @@ class Player:
 
         self.shots = MAX_SHOTS
         self.recharging = False
-        self.recharge_start = 0
 
         self.leaping = False
         self.leap_dx = 0
@@ -93,7 +92,7 @@ class Player:
         return self.action not in ["recharge", "hurt", "dead"]
 
     def can_shoot(self):
-        return self.action not in ["shoot", "attack", "recharge", "hurt", "dead"]
+        return not self.recharging and self.action not in ["shoot", "attack", "recharge", "hurt", "dead"]
 
     def can_attack(self):
         return self.action not in ["shoot", "attack", "jump", "hurt", "dead"]
@@ -214,7 +213,6 @@ class Player:
             if self.can_shoot():
                 if self.shots <= 0:
                     self.recharging = True
-                    self.recharge_start = pygame.time.get_ticks()
                     self.set_animation("recharge", self.anims["recharge"])
                 else:
                     self.shots -= 1
@@ -255,13 +253,11 @@ class Player:
             self.x += self.leap_dx
             self.y += self.leap_dy
 
-    def update_recharge(self, now):
-        if self.recharging and now - self.recharge_start >= RECHARGE_TIME:
+    def finish_recharge(self):
+        if self.recharging:
             self.recharging = False
             self.shots = MAX_SHOTS
             self.snd_reload.play()
-            if self.action == "recharge":
-                self.set_animation("idle", self.anims["idle"])
 
     def update_regen(self, now):
         if now - self.regen_timer >= PLAYER_REGEN_INTERVAL:
@@ -316,6 +312,9 @@ class Player:
             elif self.action == "dead":
                 self.frame_index = len(self.animation) - 1
             elif self.action == "hurt":
+                self.set_animation("idle", self.anims["idle"])
+            elif self.action == "recharge":
+                self.finish_recharge()
                 self.set_animation("idle", self.anims["idle"])
             else:
                 self.set_animation("idle", self.anims["idle"])

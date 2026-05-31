@@ -43,6 +43,7 @@ class Enemy:
 
         self.phase = 0
 
+
         self.fall_speed = 0
         self.on_ground = False
         self.waiting_after_civic = False
@@ -112,12 +113,14 @@ class Enemy:
     def update_march(self, now, partner_x, partner_y, partner_dead,
                      civic_x, civic_y, target_partner, civic_hit, scale, player_x):
 
+
         # 🔧 FIX 1: sync old flag with new system
         self.march = (self.mode == "march")
 
         # 🔧 FIX 2: REMOVE broken dependency
         if self.dead or self.locked:
             return civic_x, civic_y, target_partner, civic_hit
+
 
         if self.waiting_after_civic:
             self.phase = 2
@@ -153,6 +156,7 @@ class Enemy:
             else:
                 tx = player_x
 
+
         dx = tx - self.x
         distance = abs(dx)
 
@@ -175,6 +179,13 @@ class Enemy:
                 civic_y += 100
                 civic_hit = True
                 self.phase = 2
+
+                current_frame = int(self.frame_index)
+                if current_frame == 4 and not civic_hit:
+                    civic_x += 100
+                    civic_y += 100
+                    civic_hit = True
+                    self.waiting_after_civic = True
 
         return civic_x, civic_y, target_partner, civic_hit
 
