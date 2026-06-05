@@ -35,7 +35,7 @@ class Player:
 
 
         self.anims = self.normal_anims
-        self.animation = self.anims["idle"]  # ✅ FIXED
+        self.animation = self.anims["idle"]
         self.action = "idle"
         self.frame_index = 0.0
 
