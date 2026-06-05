@@ -1,87 +1,136 @@
 import pygame
-from config import (
-    ENEMY_TARGET_TIME, ENEMY_PHASE_1_TIME, RAGE_TRIGGER_TIME, ENDING_TIME, ESCAPE_TIME, ENDGAME_TIME
-)
-
-class TimelineEvent:
-    def __init__(self, trigger_time, callback, run_once=True):
-        self.trigger_time = trigger_time
-        self.callback = callback
-        self.run_once = run_once
-        self.triggered = False
-
-    def check_and_trigger(self, elapsed, game):
-        if self.run_once and self.triggered:
-            return False
-        if elapsed >= self.trigger_time:
-            self.callback(game)
-            self.triggered = True
-            return True
-        return False
+from config import FRAME_W, FRAME_H, PLAYER_PATH, RAGE_PATH, ENEMY_PATH, WOUNDED_Shoot_ENEMY_PATH,WOUNDED_Scar_ENEMY_PATH, PARTNER_PATH,Wounded_Player_PATH,Wounded_Rage_PATH
 
 
-class TimelineManager:
-    def __init__(self, game):
-        self.game = game
-        self.events = []
-        self._setup_events()
 
-    def _setup_events(self):
-        def trigger_enemy_march(game):
-            game.enemy.mode = "chase"
-            game.enemy.phase = 0
+def load_sheet(path, frame_width=FRAME_W, frame_height=FRAME_H):
+    sheet = pygame.image.load(path).convert_alpha()
+    frames = []
+    sheet_width = sheet.get_width()
+    for x in range(0, sheet_width, frame_width):
+        frame = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+        frame.blit(sheet, (0, 0), (x, 0, frame_width, frame_height))
+        frames.append(frame)
+    return frames
 
-        def trigger_enemy_phase_1(game):
-            game.enemy.mode = "march"
-            game.enemy.phase = 1
-            game.target_partner = True
-        
-        def trigger_enemy_flee_transition(game):
-            # Trigger the flee sequence
-            game.enemy_fleeing = True
-            game.enemy.locked = True  # Locks pathfinding AI to allow scripted flee logic
-            game.enemy.facing_right = True
-            game.enemy.set_animation("run", game.enemy.anims["run"])
 
-        def trigger_rage_mode(game):
-            if not game.player.rage_mode:
-                game.player.activate_rage()
-                game.enemy.hp = game.enemy.max_hp
-                game.enemy.make_normal()
-                game.player.hp = game.player.max_hp
+# Player animations
+def load_player_anims():
+    p = PLAYER_PATH
+    w= Wounded_Player_PATH
+    normal={
+        "idle": load_sheet(p + "Idle.png"),
+        "walk": load_sheet(p + "Walk.png"),
+        "jump": load_sheet(p + "Jump.png"),
+        "attack": load_sheet(p + "Attack.png"),
+        "hurt": load_sheet(p + "Hurt.png"),
+        "dead": load_sheet(p + "Dead.png"),
+        "recharge": load_sheet(p + "Recharge.png"),
+        "shoot": load_sheet(p + "Shot_1.png"),
+    }
+    wounded={
+        "idle": load_sheet(w + "Idle.png"),
+        "walk": load_sheet(w + "Walk.png"),
+        "jump": load_sheet(w + "Jump.png"),
+        "attack": load_sheet(w + "Attack.png"),
+        "hurt": load_sheet(w + "Hurt.png"),
+        "dead": load_sheet(w + "Dead.png"),
+        "recharge": load_sheet(w + "Recharge.png"),
+        "shoot": load_sheet(w + "Shot_1.png"),
+    }
+    return normal, wounded
 
-        def trigger_ending(game):
-            if not game.ending_triggered:
-                game.ending_triggered = True
-                game.enemy.locked = False
 
-        def trigger_enemy_escape(game):
-            if game.ending_triggered and not game.enemy.dead:
-                game.enemy.escape = True
-                game.enemy.locked = False
-                game.enemy.set_animation("run", game.enemy.anims["run"])
-                game.enemy.facing_right = False
+# Rage player animations
+def load_rage_anims():
+    p = RAGE_PATH
+    w= Wounded_Rage_PATH
+    attacks = [
+        load_sheet(p + "Attack_1.png"),
+        load_sheet(p + "Attack_2.png"),
+        load_sheet(p + "Attack_3.png"),
+    ]
+    normal = {
+        "idle": load_sheet(p + "Idle.png"),
+        "walk": load_sheet(p + "Walk.png"),
+        "jump": load_sheet(p + "Jump.png"),
+        "attack": attacks[0],
+        "attack2": attacks[1],
+        "attack3": attacks[2],
+        "attack_list": attacks,
+        "hurt": load_sheet(p + "Hurt.png"),
+        "dead": load_sheet(p + "Dead.png"),
+        "shoot": load_sheet(p + "Run+Attack.png"),
+    }
+    woundedAttack=[
+        load_sheet(w + "Attack_1.png"),
+        load_sheet(w + "Attack_2.png"),
+        load_sheet(w + "Attack_3.png"),
+    ]
+    wounded={
+        "idle": load_sheet(w + "Idle.png"),
+        "walk": load_sheet(w + "Walk.png"),
+        "jump": load_sheet(w + "Jump.png"),
+        "attack": woundedAttack[0],
+        "attack2": woundedAttack[1],
+        "attack3": woundedAttack[2],
+        "attack_list": woundedAttack,
+        "hurt": load_sheet(w + "Hurt.png"),
+        "dead": load_sheet(w + "Dead.png"),
+        "shoot": load_sheet(w + "Run+Attack.png"),
+    }
+    return normal, wounded
 
-        self.events.append(TimelineEvent(ENEMY_TARGET_TIME, trigger_enemy_march))
-        self.events.append(TimelineEvent(ENEMY_PHASE_1_TIME, trigger_enemy_phase_1))
-        self.events.append(TimelineEvent(ENEMY_PHASE_1_TIME, trigger_enemy_flee_transition))
-        def trigger_moon_red_before_rage(game):
-            if not game.moon_is_red:
-                game.moon_is_red = True
-                game.moon_red(True, 2000)
 
-        self.events.append(TimelineEvent(RAGE_TRIGGER_TIME - 2000, trigger_moon_red_before_rage))
-        self.events.append(TimelineEvent(RAGE_TRIGGER_TIME, trigger_rage_mode))
-        self.events.append(TimelineEvent(ENDING_TIME, trigger_ending))
-        self.events.append(TimelineEvent(ESCAPE_TIME, trigger_enemy_escape))
+# Enemy animations
+def load_enemy_anims():
+    n = ENEMY_PATH
+    ws = WOUNDED_Shoot_ENEMY_PATH
+    wc = WOUNDED_Scar_ENEMY_PATH
 
-    def update(self, now):
-        elapsed = now - self.game.start_time
+    normal = {
+        "attack": load_sheet(n + "Attack_1.png"),
+        "hurt": load_sheet(n + "Hurt.png"),
+        "idle": load_sheet(n + "Idle.png"),
+        "dead": load_sheet(wc + "Dead.png"),
+        "walk": load_sheet(n + "Walk.png"),
+        "run": load_sheet(n + "Run.png"),
+    }
 
-        if elapsed >= ENDGAME_TIME:
-            return False
+    wounded_shoot = {
+        "attack": load_sheet(ws + "Attack_1.png"),
+        "hurt": load_sheet(ws + "Hurt.png"),
+        "idle": load_sheet(ws + "Idle.png"),
+        "dead": load_sheet(wc + "Dead.png"),
+        "walk": load_sheet(ws + "Walk.png"),
+        "run": load_sheet(ws + "Run.png"),
+    }
 
-        for event in self.events:
-            event.check_and_trigger(elapsed, self.game)
+    wounded_scar = {
+        "attack": load_sheet(wc + "Attack_1.png"),
+        "hurt": load_sheet(wc + "Hurt.png"),
+        "idle": load_sheet(wc + "Idle.png"),
+        "dead": load_sheet(wc + "Dead.png"),
+        "walk": load_sheet(wc + "Walk.png"),
+        "run": load_sheet(wc + "Run.png"),
+    }
 
-        return True
+    return normal, wounded_shoot, wounded_scar
+
+
+# Partner animations
+def load_partner_anims():
+    p = PARTNER_PATH
+    return {
+        "idle": load_sheet(p + "Idle.png"),
+        "walk": load_sheet(p + "Walk.png"),
+        "hurt": load_sheet(p + "Hurt.png"),
+        "shoot": load_sheet(p + "Shot.png"),
+        "dead": load_sheet(p + "Dead.png"),
+    }
+
+
+# Civic image
+def load_civic_img():
+    img = pygame.image.load(PARTNER_PATH + "civic.png").convert_alpha()
+    return pygame.transform.scale(img, (90, 90))

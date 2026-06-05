@@ -9,10 +9,10 @@ class IntroCutscene:
         self.screen = screen
         self.font = font
 
-        # Load your narrative engine
+        # Load narrative
         self.narrative = NarrativeEngine(self.screen, self.font)
 
-        # Automatically trigger the first story beat
+        # Trigger first scene
         self.narrative.trigger_beat("prologue")
 
     def run(self):
@@ -24,19 +24,18 @@ class IntroCutscene:
                     pygame.quit()
                     sys.exit()
 
-                # Let your narrative engine listen for SPACE/Clicks
+                # Listen for SPACE/Clicks
                 self.narrative.handle_events(event)
 
-            # 1. Draw a cinematic, pitch-black background
+            # Draw black background
             self.screen.fill((5, 5, 8))
 
-            # 2. Draw your text box
+            # Draw text box
             self.narrative.draw()
 
-            # 3. The Transition Logic
-            # If the text box closes, the cutscene is over!
+            # Transition Logic
             if not self.narrative.is_active:
-                # Tell main.py to move to the next level
+                # Move to next level
                 return "start_game"
 
             pygame.display.flip()

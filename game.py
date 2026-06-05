@@ -49,7 +49,7 @@ class Game:
             self.debug_font = pygame.font.SysFont(None, 14)
             self.debug_info_font = pygame.font.SysFont(None, 16)
 
-        # Backgrounds (layered)
+        # Backgrounds
         self.bg_sky = self._load_bg(BG_SKY_PATH, (20, 20, 40))
         self.bg_clouds = self._load_bg(BG_CLOUDS_PATH, None, alpha=True)
         self.bg_rocks = self._load_bg(BG_ROCKS_PATH, None, alpha=True)
@@ -62,7 +62,7 @@ class Game:
         self.bg_moon_original = pygame.transform.scale(moon_raw, (self.moon_w, self.moon_h))
         self.bg_moon = self.bg_moon_original.copy()
 
-        # Originals for lightning flash effect
+        # Lightning flash effect
         self.bg_sky_original = self.bg_sky.copy()
         self.bg_clouds_original = self.bg_clouds.copy()
 
@@ -156,7 +156,7 @@ class Game:
         self.end_screen = EndScreen(self.screen, self.font)
         self.damage_flash_alpha = 0
 
-        # 1. Rain System
+        # Rain System
         self.rain_drops = []
         for _ in range(120):  # Create 120 raindrops
             rx = random.randint(-200, WIDTH)
@@ -164,7 +164,7 @@ class Game:
             speed = random.randint(15, 25)
             self.rain_drops.append([rx, ry, speed])
 
-        # 2. Screen Shake Tracker
+        # Screen Shake Tracker
         self.shake_frames = 0
     @staticmethod
     def _load_bg(path, fallback_color=None, alpha=False):
@@ -272,12 +272,11 @@ class Game:
     def is_on_ground(self, px, py):
         if 0 <= px < WIDTH and 0 <= py < HEIGHT:
             return self.bg_ground.get_at((int(px), int(py))).a > 0
-        # If off screen bottom, treat as ground (prevents falling forever)
         if py >= HEIGHT:
             return True
         return False
 
-    # Ending / execution system (Now delegated to self.timeline)
+    # Enemy execution
     def update_endings(self, now):
         return self.timeline.update(now)
 
@@ -405,25 +404,23 @@ class Game:
         return True
 
     def update(self, now):
-        # 1. Environmental and transition tick updates
         self._update_lightning(now)
         self._update_moon_transition(now)
 
-        # 2. Handle first scene scripted flee sequence
+        # Enemy flee sequence
         if self.enemy_fleeing:
             self.enemy.x += ESCAPE_SPEED
             
-            # Safeguard: Ensures set_animation runs only once, preventing frozen frame indexes
             if self.enemy.action != "run":
                 self.enemy.set_animation("run", self.enemy.anims["run"])
             self.enemy.facing_right = True
 
-            # Initiate screen fade-out once the enemy is fully off-screen right
+            # Initiate screen fade-out
             if self.enemy.x > WIDTH + 150 and self.fade_state == "none":
                 self.fade_state = "fading_out"
                 self.fade_timer = now
 
-        # 3. Handle black screen fade transitions
+        # Black screen fade transitions
         if self.fade_state == "fading_out":
             elapsed = now - self.fade_timer
             self.fade_alpha = min(255, int((elapsed / 1000.0) * 255))
@@ -439,7 +436,7 @@ class Game:
                 self.fade_state = "none"
                 self.fade_alpha = 0
 
-        # 5. Physics, movement, and player input loop
+        # Physics, movement, and player input loop
         keys = pygame.key.get_pressed()
         self.player.handle_movement(keys)
         self.player.handle_jump(keys)
@@ -469,7 +466,7 @@ class Game:
                 drop[0] = random.randint(-200, WIDTH)
                 drop[1] = random.randint(-200, 0)
 
-        # 6. Combat Projectiles and Hitboxes
+        # Combat Projectiles and Hitboxes
         if self.bullets.update_player_bullets(self.enemy.rect):
             if not self.enemy.dead:
                 self.enemy.hurt_from_damage()
@@ -477,7 +474,7 @@ class Game:
         self.handle_player_attack_hit()
         self.handle_leap_attack_hit()
 
-        # 7. Enemy Behavior Loop
+        # Enemy Behavior Loop
         self.enemy.update_gravity(self.is_on_ground, self.player.scale)
         self.enemy.update_auto_attack(now)
         self.civic_x, self.civic_y, self.target_partner, self.civic_hit = \
@@ -501,13 +498,13 @@ class Game:
 
         self.enemy.update_regen(now)
 
-        # 8. Partner Behavior Loop
+        # Partner Behavior Loop
         self.partner.try_shoot(now, self.bullets, self.enemy.x, self.enemy.y)
         if self.bullets.update_partner_bullets(self.enemy.rect):
             if not self.enemy.dead:
                 self.enemy.hurt_from_damage()
 
-        # Manage partner state transition delays upon defeat
+        # Manage partner state transition
         if self.partner.dead and not self.partner_death_handled:
             self.partner_death_handled = True
             self.partner_death_time = now
@@ -518,7 +515,7 @@ class Game:
             self.target_partner = False
             self.enemy.phase = 0
 
-        # 9. Sprite Sheet and Animation ticks (exactly once per loop cycle)
+        # Sprite Sheet and Animation ticks
         self.enemy.update_wounded_sprite(self.player.rage_mode)
         self.player.update_wounded_sprite()
         self.player.update_animation()
@@ -574,13 +571,13 @@ class Game:
         """Resets combat states and positions entities for Phase 2 without activating Rage Mode yet."""
         now = pygame.time.get_ticks() - self.total_paused_time
 
-        # 1. Restore Player vitals without triggering Rage Mode prematurely
+        # Restore Player vitals
         self.player.hp = self.player.max_hp
         self.player.dead = False
         if self.player.action == "dead":
             self.player.set_animation("idle", self.player.anims["idle"])
 
-        # 2. Reset and configure the enemy for the second fight
+        # Reset and configure the enemy for the second fight
         self.enemy_fleeing = False
         self.enemy.locked = False
         self.enemy.escape = False
@@ -597,7 +594,7 @@ class Game:
         self.player.facing_right = True
 
         self.level = 2
-        # Reset moon to white for Scene 2
+        # Reset moon to white
         self.moon_is_red = False
         self.moon_red(False)
 
@@ -605,11 +602,10 @@ class Game:
         self.bullets.player_bullets = []
         self.bullets.partner_bullets = []
 
-        # 3. Position timeline clock right after the first phase transition
-        # This permits 10 seconds of normal combat before Rage Mode naturally triggers at 84 seconds (RAGE_TRIGGER_TIME)
+        # Position timeline clock
         self.start_time = now - ENEMY_PHASE_1_TIME
 
-        # 4. Initiate fade-in
+        # Initiate fade-in
         self.fade_state = "fading_in"
         self.fade_timer = now
 
@@ -628,15 +624,14 @@ class Game:
         self.partner.draw(self.screen)
         self.bullets.draw_partner_bullets(self.screen)
 
-        # 1. DRAW DAMAGE FLASH
+        # DRAW DAMAGE FLASH
         if self.damage_flash_alpha > 0:
             flash_surf = pygame.Surface((WIDTH, HEIGHT))
             flash_surf.fill((255, 0, 0))
             flash_surf.set_alpha(self.damage_flash_alpha)
             self.screen.blit(flash_surf, (0, 0))
 
-        #  2. DRAW HEALTH blur
-        # As HP drops, the screen gets darker and more claustrophobic
+        #  DRAW HEALTH blur
         if self.player.hp > 0:
             hp_percent = self.player.hp / self.player.max_hp
             vignette_alpha = int(180 * (1.0 - hp_percent))  # Max darkness is 180
@@ -646,22 +641,21 @@ class Game:
                 vig_surf.set_alpha(vignette_alpha)
                 self.screen.blit(vig_surf, (0, 0))
 
-        # 3. DRAW RAIN
+        # DRAW RAIN
         for drop in self.rain_drops:
             pygame.draw.line(self.screen, (150, 150, 180), (drop[0], drop[1]), (drop[0] + drop[2] // 4, drop[1] + 30),
                              2)
 
-        # 4 SCREEN SHAKE
+        # SCREEN SHAKE
         if self.shake_frames > 0:
             self.shake_frames -= 1
-            # Copy the screen, black it out, and paste it back slightly offset!
             shake_offset_x = random.randint(-8, 8)
             shake_offset_y = random.randint(-8, 8)
             shake_copy = self.screen.copy()
             self.screen.fill((0, 0, 0))
             self.screen.blit(shake_copy, (shake_offset_x, shake_offset_y))
 
-        # 5 Draw the black fade-to-black transition overlay
+        # Draw the transition overlay
         if self.fade_alpha > 0:
             fade_surf = pygame.Surface((WIDTH, HEIGHT))
             fade_surf.fill((0, 0, 0))
@@ -718,10 +712,9 @@ class Game:
             s.blit(self.debug_info_font.render("AMMO:", True, (200, 200, 200)), (20, 90))
             for i in range(12):
                 color = (255, 200, 50) if i < p.shots else (100, 100, 100)
-                # Shifted the bullets slightly right to make room for the label
                 pygame.draw.rect(s, color, (80 + (i * 15), 90, 10, 15))
 
-            # Flashing RELOADINGAlert
+            # Flashing RELOADING Alert
             if p.shots == 0 and int(now / 250) % 2 == 0:
                 s.blit(self.debug_info_font.render("RELOADING...", True, (255, 50, 50)), (270, 90))
 
@@ -911,21 +904,17 @@ class Game:
 
             self.handle_events()
 
-            # Break the loop and return to main.py if player clicked MAIN MENU
             if self.return_to_menu:
                 pygame.mixer.music.stop()
                 return
 
-                # Calculate frozen time
             frozen_now = raw_now - self.total_paused_time
 
-            # Only update characters and endings if the game is NOT paused
             if not self.paused:
                 if not self.update_endings(frozen_now):
                     break
                 self.update(frozen_now)
 
-            # Always draw the background game
             self.draw(frozen_now)
 
             # Interlude between Scene 1 and Scene 2
@@ -935,9 +924,9 @@ class Game:
                 now = pygame.time.get_ticks() - self.total_paused_time
                 self.transition_to_next_scene()
 
-            # ---  END SCREEN  ---
+            # END SCREEN
             if self.game_end:
-                pygame.mixer.music.stop()  # Stop the intense Scene 2 music
+                pygame.mixer.music.stop()
 
                 # Figure out if they won, lost, or died
                 if "EXECUTED" in self.game_result:
@@ -947,16 +936,13 @@ class Game:
                 else:
                     result_type = "game_over"
 
-                # Run the screen and return their choice (play_again or main_menu)
                 choice = self.end_screen.run(result_type)
                 return choice
 
-            # If the timeline completely times out, fallback to menu
         pygame.mixer.music.stop()
         return "main_menu"
 
 
-        # If the game naturally ends (death/escape) stop music and return to menu
         pygame.mixer.music.stop()
         return
 

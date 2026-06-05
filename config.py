@@ -21,13 +21,13 @@ GRID_COLOR = (255, 255, 255)
 GRID_SPACING = 100
 GRID_ALPHA = 40
 
-# Player character offset (whitespace padding in sprite frames)
+# Player character offset
 PLAYER_CHAR_OFFSET_X = 40
 PLAYER_CHAR_OFFSET_Y = 60
 PLAYER_CHAR_HITBOX_W = FRAME_W - 80   # 48
 PLAYER_CHAR_HITBOX_H = FRAME_H - 60   # 68
 
-# Enemy character offset (whitespace padding in sprite frames)
+# Enemy character offset
 ENEMY_CHAR_OFFSET_X = 40
 ENEMY_CHAR_OFFSET_Y = 65
 ENEMY_CHAR_HITBOX_W = 70

@@ -114,10 +114,8 @@ class Enemy:
                      civic_x, civic_y, target_partner, civic_hit, scale, player_x):
 
 
-        # 🔧 FIX 1: sync old flag with new system
         self.march = (self.mode == "march")
 
-        # 🔧 FIX 2: REMOVE broken dependency
         if self.dead or self.locked:
             return civic_x, civic_y, target_partner, civic_hit
 
@@ -189,9 +187,7 @@ class Enemy:
 
         return civic_x, civic_y, target_partner, civic_hit
 
-    # -------------------------
     # DAMAGE PLAYER
-    # -------------------------
     def damage_player(self, player, now):
         if self.action != "attack" or player.action == "hurt":
             return
@@ -207,9 +203,7 @@ class Enemy:
         if attack_rect.colliderect(player.rect):
             player.take_damage(ENEMY_ATTACK_DAMAGE, now)
 
-    # -------------------------
     # DAMAGE PARTNER
-    # -------------------------
     def damage_partner(self, partner, now):
         if not partner or partner.dead:
             return
@@ -231,9 +225,7 @@ class Enemy:
                     partner.dead = True
                     partner.set_animation("dead", partner.anims["dead"])
 
-    # -------------------------
-    # OTHER SYSTEMS (UNCHANGED)
-    # -------------------------
+    # OTHER SYSTEMS
     def update_auto_attack(self, now):
         if self.dead or self.march or self.locked:
             return

@@ -134,7 +134,6 @@ class Player:
         self.rage_mode = True
         self.scale = RAGE_SCALE
 
-        # force correct set immediately
         self.anims = self.rage_wounded_anims if self.hp < self.max_hp  else self.rage_normal_anims
 
         self.set_animation("idle", self.anims["idle"])

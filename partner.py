@@ -72,4 +72,3 @@ class Partner:
         screen.blit(frame, (self.x, self.y))
 
 
-

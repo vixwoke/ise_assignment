@@ -88,9 +88,7 @@ class MainMenu:
 
             self.draw_text_center("WAKING DEMON", self.title_font, (255, 50, 50), 150)
 
-            # ---------------------------------------------------------
-            # STATE: MAIN MENU
-            # ---------------------------------------------------------
+            # MAIN MENU
             if self.state == "MAIN":
                 if self.draw_button(self.start_btn, "START GAME", mouse_pos, mouse_clicked):
                     return "PLAY"
@@ -102,9 +100,7 @@ class MainMenu:
                     pygame.quit()
                     sys.exit()
 
-            # ---------------------------------------------------------
-            # STATE: STORY
-            # ---------------------------------------------------------
+            # STORY
             elif self.state == "STORY":
                 story_text = [
                     "John and his partner, police officers investigating reports",
@@ -122,9 +118,7 @@ class MainMenu:
                 if self.draw_button(self.back_btn, "BACK", mouse_pos, mouse_clicked):
                     self.state = "MAIN"
 
-            # ---------------------------------------------------------
-            # STATE: CONTROLS
-            # ---------------------------------------------------------
+            # CONTROLS
             elif self.state == "CONTROLS":
                 controls_text = [
                     "W A S D - Move Character",

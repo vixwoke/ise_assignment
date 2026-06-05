@@ -8,21 +8,21 @@ class EndScreen:
         self.screen = screen
         self.font = font
 
-        # Create a dark, semi-transparent overlay
+        # Semi-transparent overlay
         self.bg_overlay = pygame.Surface((WIDTH, HEIGHT))
         self.bg_overlay.set_alpha(210)
         self.bg_overlay.fill((10, 10, 15))
 
-        # Setup Button Dimensions
+        # Button Dimensions
         button_width = 300
         button_height = 60
         center_x = WIDTH // 2 - button_width // 2
 
-        # Create Button Hitboxes
+        # Button Hitboxes
         self.btn_play_again = pygame.Rect(center_x, HEIGHT // 2 + 50, button_width, button_height)
         self.btn_main_menu = pygame.Rect(center_x, HEIGHT // 2 + 130, button_width, button_height)
 
-        # Load UI Audio
+        # UI Audio
         try:
             self.snd_click = pygame.mixer.Sound("resources/audio/ui_click.wav")
             self.snd_click.set_volume(0.6)
@@ -62,21 +62,21 @@ class EndScreen:
                         if self.snd_click: self.snd_click.play()
                         return "main_menu"
 
-            # 1. Draw the dark overlay on top of the frozen game
+            # Draw overlay
             self.screen.blit(self.bg_overlay, (0, 0))
 
-            # 2. Draw the Dynamic Titles
+            # Dynamic tiles
             if result == "victory":
                 self.draw_text_center("ENEMY EXECUTED", self.font, (50, 255, 50), HEIGHT // 2 - 120)
                 self.draw_text_center("The forest is safe... for now.", self.font, (200, 200, 200), HEIGHT // 2 - 40)
             elif result == "defeat":
                 self.draw_text_center("ENEMY ESCAPED", self.font, (255, 50, 50), HEIGHT // 2 - 120)
                 self.draw_text_center("John was too late.", self.font, (200, 200, 200), HEIGHT // 2 - 40)
-                # --- GAME OVER TEXT ---
+                # Game Over
             elif result == "game_over":
                 self.draw_text_center("YOU DIED", self.font, (255, 50, 50), HEIGHT // 2 - 120)
                 self.draw_text_center("The beast consumed you.", self.font, (200, 200, 200), HEIGHT // 2 - 40)
-            # 3. Draw the Buttons
+            # Draw buttons
             self.draw_button(self.btn_play_again, "PLAY AGAIN", mouse_pos)
             self.draw_button(self.btn_main_menu, "MAIN MENU", mouse_pos)
 

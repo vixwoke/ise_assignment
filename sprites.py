@@ -82,7 +82,7 @@ def load_rage_anims():
     return normal, wounded
 
 
-# Enemy animations (normal + wounded variants)
+# Enemy animations
 def load_enemy_anims():
     n = ENEMY_PATH
     ws = WOUNDED_Shoot_ENEMY_PATH
